@@ -1,34 +1,181 @@
-import { useState } from 'react'
-import { User, CheckCircle, AlertTriangle, Clock, Plus, ChevronRight, Mail, Phone, Shield } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { User, CheckCircle, AlertTriangle, Clock, Plus, ChevronRight, Mail, Phone, Shield, X, Save } from 'lucide-react'
 import { TENANTS, getPropertyById, getTenancyByPropertyId } from '../data/mockData'
+import { supabase, isConfigured } from '../lib/supabase'
 
+// ─── RTR Status config ────────────────────────────────────────────────────────
+const RTR_STATUSES = [
+  { value: 'verified',            label: '✓ Verified',            class: 'badge-green',  color: '#10b981', icon: CheckCircle,  desc: 'Documents checked and on file' },
+  { value: 'expiring_soon',       label: '⚠ Expiring Soon',       class: 'badge-amber',  color: '#d97706', icon: Clock,        desc: 'Re-check required within 60 days' },
+  { value: 'documents_requested', label: '📋 Docs Requested',     class: 'badge-blue',   color: '#2563eb', icon: Shield,       desc: 'Documents requested from tenant' },
+  { value: 'documents_received',  label: '📄 Docs Received',      class: 'badge-purple', color: '#7c3aed', icon: Shield,       desc: 'Documents received, pending check' },
+  { value: 'not_verified',        label: '⚠ Not Verified',        class: 'badge-red',    color: '#dc2626', icon: AlertTriangle, desc: 'No RTR check completed — action required' },
+]
+
+const RTR_KEY = 'propertyops_rtr_overrides'
+
+function getRTROverrides() {
+  try { return JSON.parse(localStorage.getItem(RTR_KEY) || '{}') } catch { return {} }
+}
+function setRTROverride(tenantId, data) {
+  const all = getRTROverrides()
+  all[tenantId] = data
+  localStorage.setItem(RTR_KEY, JSON.stringify(all))
+}
+
+function getRTRStatus(tenant, overrides = {}) {
+  const override = overrides[tenant.id]
+
+  // Use override if set
+  if (override) {
+    return {
+      ...override,
+      statusConfig: RTR_STATUSES.find(s => s.value === override.status) || RTR_STATUSES[4],
+    }
+  }
+
+  // Default from mock data
+  if (!tenant.rtRVerified) {
+    return { status: 'not_verified', expiry: null, statusConfig: RTR_STATUSES[4] }
+  }
+  if (!tenant.rtRExpiry) {
+    return { status: 'verified', expiry: null, statusConfig: RTR_STATUSES[0] }
+  }
+  const days = Math.round((new Date(tenant.rtRExpiry) - new Date()) / (1000 * 60 * 60 * 24))
+  if (days <= 60 && days > 0) {
+    return { status: 'expiring_soon', expiry: tenant.rtRExpiry, statusConfig: RTR_STATUSES[1] }
+  }
+  return { status: 'verified', expiry: tenant.rtRExpiry, statusConfig: RTR_STATUSES[0] }
+}
+
+// ─── RTR Update Modal ─────────────────────────────────────────────────────────
+function RTRModal({ tenant, property, currentRTR, onSave, onClose }) {
+  const [status, setStatus]   = useState(currentRTR.status)
+  const [expiry, setExpiry]   = useState(currentRTR.expiry || '')
+  const [notes, setNotes]     = useState(currentRTR.notes || '')
+  const [saving, setSaving]   = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    const data = { status, expiry: expiry || null, notes, updatedAt: new Date().toISOString() }
+    setRTROverride(tenant.id, data)
+
+    // Save to Supabase if configured
+    if (isConfigured) {
+      try {
+        await supabase.from('rtr_verifications').upsert({
+          tenant_id: tenant.id,
+          ...data,
+        })
+      } catch (e) { console.warn('Supabase RTR save failed:', e) }
+    }
+    onSave(tenant.id, data)
+    setSaving(false)
+    onClose()
+  }
+
+  const sc = RTR_STATUSES.find(s => s.value === status)
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onClose}>
+      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 480, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Update Right to Rent</h2>
+            <p style={{ fontSize: 13, color: '#64748b' }}>{tenant.name} · {property?.address}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <X size={18} color="#94a3b8" />
+          </button>
+        </div>
+
+        {/* Status picker */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 10 }}>Verification Status</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {RTR_STATUSES.map(s => (
+              <button key={s.value} onClick={() => setStatus(s.value)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px',
+                  borderRadius: 10, border: status === s.value ? `2px solid ${s.color}` : '1.5px solid #e2e8f0',
+                  background: status === s.value ? `${s.color}10` : 'white',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.15s',
+                }}>
+                <s.icon size={16} color={s.color} style={{ flexShrink: 0 }} />
+                <div>
+                  <p style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>{s.label}</p>
+                  <p style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 1 }}>{s.desc}</p>
+                </div>
+                {status === s.value && (
+                  <CheckCircle size={16} color={s.color} style={{ marginLeft: 'auto' }} />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Expiry date */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Document / Visa Expiry Date <span style={{ color: '#cbd5e1', fontWeight: 400 }}>(optional)</span>
+          </label>
+          <input type="date" value={expiry} onChange={e => setExpiry(e.target.value)}
+            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 9, padding: '10px 12px', fontSize: 13.5, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: '#0f172a' }}
+            onFocus={e => e.target.style.borderColor = '#10b981'}
+            onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+        </div>
+
+        {/* Notes */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Notes <span style={{ color: '#cbd5e1', fontWeight: 400 }}>(optional)</span>
+          </label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+            placeholder="e.g. Passport seen and copied, BRP card verified, share code confirmed…"
+            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 9, padding: '10px 12px', fontSize: 13.5, outline: 'none', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box', color: '#0f172a' }}
+            onFocus={e => e.target.style.borderColor = '#10b981'}
+            onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onClose} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>
+            <Save size={14} /> {saving ? 'Saving…' : 'Save RTR Status'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function Tenants() {
-  const [search, setSearch] = useState('')
+  const [search, setSearch]       = useState('')
+  const [overrides, setOverrides] = useState(getRTROverrides())
+  const [editing, setEditing]     = useState(null) // tenant being edited
 
   const enriched = TENANTS.map(t => ({
     ...t,
     property: getPropertyById(t.propertyId),
     tenancy:  getTenancyByPropertyId(t.propertyId),
+    rtr:      getRTRStatus(t, overrides),
   })).filter(t => {
     if (!search) return true
     const q = search.toLowerCase()
     return t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || t.property?.address?.toLowerCase().includes(q)
   })
 
-  const rtrIssues = TENANTS.filter(t => !t.rtRVerified).length
-  const expiringSoon = TENANTS.filter(t => {
-    if (!t.rtRExpiry) return false
-    const d = new Date(t.rtRExpiry)
-    const days = (d - new Date()) / (1000 * 60 * 60 * 24)
-    return days <= 60 && days > 0
-  }).length
+  const rtrIssues    = enriched.filter(t => t.rtr.status === 'not_verified').length
+  const expiringSoon = enriched.filter(t => t.rtr.status === 'expiring_soon').length
+  const docsRequested= enriched.filter(t => t.rtr.status === 'documents_requested' || t.rtr.status === 'documents_received').length
 
-  function rtrStatus(t) {
-    if (!t.rtRVerified) return { label: 'Not Verified', class: 'badge-red', icon: AlertTriangle, color: '#dc2626' }
-    if (!t.rtRExpiry)  return { label: 'Verified', class: 'badge-green', icon: CheckCircle, color: '#10b981' }
-    const days = Math.round((new Date(t.rtRExpiry) - new Date()) / (1000 * 60 * 60 * 24))
-    if (days <= 60)    return { label: `Exp. ${new Date(t.rtRExpiry).toLocaleDateString('en-GB')}`, class: 'badge-amber', icon: Clock, color: '#d97706' }
-    return { label: 'Verified', class: 'badge-green', icon: CheckCircle, color: '#10b981' }
+  const handleSave = (tenantId, data) => {
+    setOverrides(prev => ({ ...prev, [tenantId]: data }))
   }
 
   return (
@@ -36,17 +183,34 @@ export default function Tenants() {
       <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h1 className="page-title">Tenants</h1>
-          <p className="page-subtitle">{TENANTS.length} active tenants · {rtrIssues} RTR issues · {expiringSoon} expiring soon</p>
+          <p className="page-subtitle">{TENANTS.length} active tenants · {rtrIssues} RTR not verified · {expiringSoon} expiring soon</p>
         </div>
         <button className="btn-primary"><Plus size={13} /> Add Tenant</button>
       </div>
 
-      {/* Alert */}
+      {/* RTR legend */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, padding: '10px 14px', background: 'white', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginRight: 4 }}>RTR Status:</span>
+        {RTR_STATUSES.map(s => (
+          <span key={s.value} className={`badge ${s.class}`} style={{ fontSize: 11 }}>{s.label}</span>
+        ))}
+        <span style={{ fontSize: 11.5, color: '#94a3b8', marginLeft: 'auto' }}>Click any RTR badge to update</span>
+      </div>
+
+      {/* Alerts */}
       {rtrIssues > 0 && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, marginBottom: 20 }}>
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, marginBottom: 16 }}>
           <AlertTriangle size={16} color="#dc2626" style={{ flexShrink: 0 }} />
           <p style={{ fontSize: 13, fontWeight: 600, color: '#991b1b' }}>
-            Right to Rent not verified for {rtrIssues} tenant{rtrIssues !== 1 ? 's' : ''} — civil penalty up to £10,000 per tenant
+            Right to Rent not verified for {rtrIssues} tenant{rtrIssues !== 1 ? 's' : ''} — civil penalty up to £10,000 per tenant. Click the badge to update.
+          </p>
+        </div>
+      )}
+      {expiringSoon > 0 && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, marginBottom: 16 }}>
+          <Clock size={16} color="#d97706" style={{ flexShrink: 0 }} />
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>
+            {expiringSoon} tenant RTR document{expiringSoon !== 1 ? 's' : ''} expiring within 60 days — re-check required.
           </p>
         </div>
       )}
@@ -76,7 +240,8 @@ export default function Tenants() {
           </thead>
           <tbody>
             {enriched.map(t => {
-              const rtr = rtrStatus(t)
+              const { statusConfig, status, expiry, notes } = t.rtr
+              const Icon = statusConfig.icon
               return (
                 <tr key={t.id} style={{ cursor: 'pointer' }}>
                   <td>
@@ -96,12 +261,31 @@ export default function Tenants() {
                   </td>
                   <td style={{ fontSize: 12.5, color: '#64748b' }}>{t.nationality}</td>
                   <td>
-                    <span className={`badge ${rtr.class}`}>
-                      {t.rtRVerified ? '✓ Verified' : '⚠ Not Verified'}
-                    </span>
+                    {/* Clickable RTR badge */}
+                    <button
+                      onClick={() => setEditing(t)}
+                      title="Click to update RTR status"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '4px 10px', borderRadius: 20,
+                        border: `1px solid ${statusConfig.color}40`,
+                        background: `${statusConfig.color}15`,
+                        color: statusConfig.color,
+                        fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+                      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                    >
+                      <Icon size={11} />
+                      {statusConfig.label.replace(/^[^\w]*/, '')}
+                      <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 2 }}>✎</span>
+                    </button>
+                    {notes && <p style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 3, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notes}</p>}
                   </td>
-                  <td style={{ fontSize: 12.5, color: !t.rtRVerified ? '#dc2626' : '#64748b', fontWeight: !t.rtRVerified ? 700 : 400 }}>
-                    {t.rtRExpiry ? new Date(t.rtRExpiry).toLocaleDateString('en-GB') : '—'}
+                  <td style={{ fontSize: 12.5, color: (status === 'expiring_soon') ? '#d97706' : '#64748b', fontWeight: (status === 'expiring_soon') ? 700 : 400 }}>
+                    {expiry ? new Date(expiry).toLocaleDateString('en-GB') : '—'}
                   </td>
                   <td style={{ fontWeight: 600, color: '#0f172a' }}>£{t.tenancy?.monthlyRent?.toLocaleString() || '—'}</td>
                   <td>
@@ -119,56 +303,41 @@ export default function Tenants() {
 
       {/* ── MOBILE CARDS ── */}
       <div className="mobile-card-list">
-        <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>{enriched.length} tenants</p>
+        <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>{enriched.length} tenants · tap RTR badge to update</p>
         {enriched.map(t => {
-          const rtr = rtrStatus(t)
-          const RtrIcon = rtr.icon
+          const { statusConfig, status, expiry } = t.rtr
+          const Icon = statusConfig.icon
           return (
-            <div key={t.id} style={{
-              background: 'white', borderRadius: 12, padding: '14px 16px',
-              border: `1px solid ${!t.rtRVerified ? '#fecaca' : t.tenancy?.arrears > 0 ? '#fde68a' : '#e2e8f0'}`,
-            }}>
-              {/* Top row */}
+            <div key={t.id} style={{ background: 'white', borderRadius: 12, padding: '14px 16px', border: `1px solid ${status === 'not_verified' ? '#fecaca' : status === 'expiring_soon' ? '#fde68a' : '#e2e8f0'}` }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <User size={18} color="#10b981" />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontWeight: 700, fontSize: 14.5, color: '#0f172a' }}>{t.name}</p>
-                  <p style={{ fontSize: 12, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {t.property?.address}, {t.property?.postcode}
-                  </p>
+                  <p style={{ fontSize: 12, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.property?.address}</p>
                 </div>
-                {t.tenancy?.arrears > 0 && (
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 800, color: '#dc2626' }}>£{t.tenancy.arrears.toLocaleString()}</p>
-                    <p style={{ fontSize: 10.5, color: '#dc2626' }}>arrears</p>
-                  </div>
-                )}
+                {t.tenancy?.arrears > 0 && <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 800, color: '#dc2626' }}>£{t.tenancy.arrears.toLocaleString()}</p>
+                  <p style={{ fontSize: 10.5, color: '#dc2626' }}>arrears</p>
+                </div>}
               </div>
-
-              {/* Detail grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                <div style={{ background: !t.rtRVerified ? '#fef2f2' : '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
-                  <p style={{ fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.04em', marginBottom: 4 }}>Right to Rent</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <RtrIcon size={13} color={rtr.color} />
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: rtr.color }}>{t.rtRVerified ? 'Verified' : 'Not Verified'}</span>
-                  </div>
-                  {t.rtRExpiry && (
-                    <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Exp: {new Date(t.rtRExpiry).toLocaleDateString('en-GB')}</p>
-                  )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ background: `${statusConfig.color}10`, border: `1px solid ${statusConfig.color}30`, borderRadius: 8, padding: '8px 10px' }}>
+                  <p style={{ fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', marginBottom: 4 }}>Right to Rent</p>
+                  <button onClick={() => setEditing(t)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                    <Icon size={13} color={statusConfig.color} />
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: statusConfig.color }}>{statusConfig.label.replace(/^[^\w]*/, '')} ✎</span>
+                  </button>
+                  {expiry && <p style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>Exp: {new Date(expiry).toLocaleDateString('en-GB')}</p>}
                 </div>
                 <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
-                  <p style={{ fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.04em', marginBottom: 4 }}>Monthly Rent</p>
-                  <p style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>
-                    {t.tenancy ? `£${t.tenancy.monthlyRent.toLocaleString()}` : '—'}
-                  </p>
+                  <p style={{ fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', marginBottom: 4 }}>Monthly Rent</p>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{t.tenancy ? `£${t.tenancy.monthlyRent.toLocaleString()}` : '—'}</p>
                 </div>
               </div>
-
-              {/* Contact + nationality */}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 10, borderTop: '1px solid #f8fafc' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 10, borderTop: '1px solid #f8fafc', marginTop: 10 }}>
                 <a href={`tel:${t.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: '#334155', textDecoration: 'none', flex: 1 }}>
                   <Phone size={12} color="#94a3b8" /> {t.phone}
                 </a>
@@ -178,6 +347,17 @@ export default function Tenants() {
           )
         })}
       </div>
+
+      {/* RTR Update Modal */}
+      {editing && (
+        <RTRModal
+          tenant={editing}
+          property={editing.property}
+          currentRTR={editing.rtr}
+          onSave={handleSave}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   )
 }
