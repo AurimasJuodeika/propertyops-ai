@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { FileText, AlertTriangle, ChevronRight, Plus, PoundSterling, Calendar, User, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react'
-import { TENANCIES, getPropertyById, getTenantById } from '../data/mockData'
+import { useNavigate } from 'react-router-dom'
+import { FileText, AlertTriangle, ChevronRight, Plus, PoundSterling, Calendar, User, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { TENANCIES, getPropertyById, getTenantById, PROPERTIES } from '../data/mockData'
 import { recordPayment, getPayments, calculateArrears, getCurrentMonthDueDate } from '../lib/payments'
 
 const STATUS_CONFIG = {
@@ -263,8 +264,13 @@ function TenancyRow({ tenancy, onPaymentUpdate }) {
 }
 
 export default function Tenancies() {
-  const [filter, setFilter]   = useState('All')
-  const [refresh, setRefresh] = useState(0)
+  const navigate = useNavigate()
+  const [filter, setFilter]     = useState('All')
+  const [refresh, setRefresh]   = useState(0)
+  const [showPropertyPicker, setShowPropertyPicker] = useState(false)
+
+  // Void properties available for new tenancy
+  const voidProperties = PROPERTIES.filter(p => p.status === 'void')
 
   const enriched = TENANCIES.map(t => ({
     ...t,
@@ -285,7 +291,7 @@ export default function Tenancies() {
           <h1 className="page-title">Tenancies</h1>
           <p className="page-subtitle">{TENANCIES.length} tenancies · {endingSoon} ending soon · {expired} expired</p>
         </div>
-        <button className="btn-primary"><Plus size={13} /> New Tenancy</button>
+        <button className="btn-primary" onClick={() => setShowPropertyPicker(v => !v)}><Plus size={13} /> New Tenancy</button>
       </div>
 
       {/* Stats */}
@@ -323,6 +329,55 @@ export default function Tenancies() {
           />
         ))}
       </div>
+
+      {/* Property picker for New Tenancy */}
+      {showPropertyPicker && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.6)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+          onClick={() => setShowPropertyPicker(false)}>
+          <div style={{ background:'white', borderRadius:16, width:'100%', maxWidth:480, padding:24, maxHeight:'80vh', overflowY:'auto', boxShadow:'0 24px 60px rgba(0,0,0,0.25)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+              <div>
+                <h2 style={{ fontSize:17, fontWeight:800, color:'#0f172a' }}>New Tenancy</h2>
+                <p style={{ fontSize:12.5, color:'#64748b', marginTop:2 }}>Select the property to create a tenancy for</p>
+              </div>
+              <button onClick={() => setShowPropertyPicker(false)} style={{ background:'none', border:'none', cursor:'pointer' }}>
+                <X size={18} color="#94a3b8" />
+              </button>
+            </div>
+            {voidProperties.length === 0 ? (
+              <p style={{ fontSize:13.5, color:'#94a3b8', textAlign:'center', padding:'24px 0', fontStyle:'italic' }}>
+                No void properties found. All properties are currently let.
+              </p>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <p style={{ fontSize:12, color:'#64748b', marginBottom:4 }}>
+                  Void properties ({voidProperties.length}):
+                </p>
+                {voidProperties.map(p => (
+                  <button key={p.id}
+                    onClick={() => { setShowPropertyPicker(false); navigate(`/properties/${p.id}`, { state: { openTenancy: true } }) }}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:10, border:'1.5px solid #e2e8f0', background:'white', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor='#10b981'; e.currentTarget.style.background='#f0fdf4' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.background='white' }}>
+                    <div style={{ width:36, height:36, borderRadius:9, background:'#f0fdf4', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <FileText size={16} color="#10b981" />
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <p style={{ fontWeight:600, fontSize:13.5, color:'#0f172a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.address}</p>
+                      <p style={{ fontSize:12, color:'#94a3b8' }}>{p.postcode} · {p.bedrooms}bd {p.type} · £{p.rent.toLocaleString()}/mo</p>
+                    </div>
+                    <ChevronRight size={14} color="#cbd5e1" />
+                  </button>
+                ))}
+              </div>
+            )}
+            <p style={{ fontSize:12, color:'#94a3b8', marginTop:16, textAlign:'center' }}>
+              You'll be taken to the property to create the tenancy.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

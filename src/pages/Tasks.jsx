@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckSquare, AlertTriangle, Clock, CheckCircle, Plus, Zap, Filter, User } from 'lucide-react'
+import { CheckSquare, AlertTriangle, Clock, CheckCircle, Plus, Zap, Filter, User, X, Save } from 'lucide-react'
 import { TASKS, getPropertyById, getStaffById } from '../data/mockData'
 
 const TYPE_CONFIG = {
@@ -20,9 +20,15 @@ const STATUS_CONFIG = {
 }
 
 export default function Tasks() {
-  const [filter, setFilter] = useState('All')
+  const [filter, setFilter]       = useState('All')
+  const [showNewTask, setShowNewTask] = useState(false)
+  const [newTask, setNewTask]     = useState({ title: '', type: 'compliance', priority: 'medium', dueDate: '', notes: '' })
+  const [customTasks, setCustomTasks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('propertyops_custom_tasks') || '[]') } catch { return [] }
+  })
 
-  const enriched = TASKS
+  const allTasks = [...TASKS, ...customTasks]
+  const enriched = allTasks
     .map(t => ({
       ...t,
       property: getPropertyById(t.propertyId),
@@ -31,6 +37,16 @@ export default function Tasks() {
     .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
 
   const filtered = filter === 'All' ? enriched : enriched.filter(t => t.status === filter)
+
+  const saveNewTask = () => {
+    if (!newTask.title.trim()) return
+    const task = { ...newTask, id: 'ct_' + Date.now(), status: 'pending', automated: false, propertyId: null, assignedTo: null }
+    const updated = [task, ...customTasks]
+    setCustomTasks(updated)
+    localStorage.setItem('propertyops_custom_tasks', JSON.stringify(updated))
+    setNewTask({ title: '', type: 'compliance', priority: 'medium', dueDate: '', notes: '' })
+    setShowNewTask(false)
+  }
 
   const overdue = enriched.filter(t => t.status === 'overdue').length
   const pending = enriched.filter(t => t.status === 'pending').length
@@ -45,8 +61,8 @@ export default function Tasks() {
           <p className="page-subtitle">{TASKS.length} tasks · {overdue} overdue · {automated} auto-generated</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-secondary"><Zap size={13} /> Run Workflow Scan</button>
-          <button className="btn-primary"><Plus size={13} /> New Task</button>
+          <button className="btn-secondary" onClick={() => setFilter('overdue')}><Zap size={13} /> Show Overdue</button>
+          <button className="btn-primary" onClick={() => setShowNewTask(v => !v)}><Plus size={13} /> New Task</button>
         </div>
       </div>
 
@@ -72,6 +88,43 @@ export default function Tasks() {
           </div>
         ))}
       </div>
+
+      {/* Quick task form */}
+      {showNewTask && (
+        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 18px', marginBottom: 16, boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <p style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>New Task</p>
+            <button onClick={() => setShowNewTask(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={15} color="#94a3b8" /></button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+            <input value={newTask.title} onChange={e => setNewTask(t => ({ ...t, title: e.target.value }))}
+              placeholder="Task title *" autoFocus
+              style={{ border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13.5, outline: 'none', fontFamily: 'inherit', color: '#0f172a', width: '100%', boxSizing: 'border-box' }}
+              onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <select value={newTask.type} onChange={e => setNewTask(t => ({ ...t, type: e.target.value }))}
+                style={{ border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', cursor: 'pointer' }}>
+                {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <select value={newTask.priority} onChange={e => setNewTask(t => ({ ...t, priority: e.target.value }))}
+                style={{ border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', cursor: 'pointer' }}>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <input type="date" value={newTask.dueDate} onChange={e => setNewTask(t => ({ ...t, dueDate: e.target.value }))}
+                style={{ border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 13 }} onClick={() => setShowNewTask(false)}>Cancel</button>
+              <button className="btn-primary" style={{ flex: 2, justifyContent: 'center', fontSize: 13 }} onClick={saveNewTask} disabled={!newTask.title.trim()}>
+                <Save size={13} /> Create Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
         {['All','overdue','pending','in_progress','completed'].map(f => (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, Building2, MapPin, User, Users, Wrench, ShieldCheck,
   ClipboardCheck, FileText, PoundSterling, AlertTriangle, CheckCircle,
@@ -17,6 +17,7 @@ import RentEditModal from '../components/RentEditModal'
 import EditPropertyModal from '../components/EditPropertyModal'
 import NewTenancyModal from '../components/NewTenancyModal'
 import EndTenancyModal from '../components/EndTenancyModal'
+import EditTenancyModal from '../components/EditTenancyModal'
 import RenewalModal from '../components/RenewalModal'
 import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getRentHistory, getJobStatuses, setJobStatus, getEffectiveJobStatus, getInspectionOverrides, setInspectionOverride, getNewProperties, getAssignedTenantId, assignTenantToProperty, getTenantAssignments, getCustomTenants, createCustomTenant, setPropertyOverride } from '../lib/propertyOverrides'
 import { getPayments, calculateArrears } from '../lib/payments'
@@ -407,12 +408,13 @@ function TabBtn({ label, active, onClick, badge }) {
 }
 
 export default function PropertyDetail() {
-  const { id } = useParams()
+  const { id }    = useParams()
+  const location  = useLocation()
   const navigate = useNavigate()
-  const [tab, setTab]                   = useState('overview')
+  const [tab, setTab]                   = useState(location.state?.openTenancy ? 'tenancy' : 'overview')
   const [editingRent, setEditingRent]         = useState(null)
   const [editingProperty, setEditingProperty] = useState(null)
-  const [showNewTenancy, setShowNewTenancy]   = useState(false)
+  const [showNewTenancy, setShowNewTenancy]   = useState(location.state?.openTenancy === true)
   const [showEndTenancy, setShowEndTenancy]   = useState(false)
   const [showRenewal, setShowRenewal]         = useState(false)
   const [showEditTenancy, setShowEditTenancy] = useState(false)
@@ -1084,6 +1086,34 @@ export default function PropertyDetail() {
           }}
           onDelete={() => navigate('/properties')}
           onClose={() => setEditingProperty(null)}
+        />
+      )}
+
+      {/* Edit tenancy modal */}
+      {showEditTenancy && (storedTenancy || tenancy) && (
+        <EditTenancyModal
+          tenancy={storedTenancy || tenancy}
+          onSave={(updated) => {
+            setStoredTenancy(updated)
+            const entry = addActivityEntry(id, { type: 'tenancy', text: 'Tenancy details updated' })
+            setActivityLog(prev => [entry, ...prev])
+            showToast('Tenancy updated')
+            setShowEditTenancy(false)
+          }}
+          onClose={() => setShowEditTenancy(false)}
+        />
+      )}
+
+      {/* Assign tenant panel */}
+      {showAssignTenant && (
+        <AssignTenantPanel
+          property={property}
+          currentTenant={tenant}
+          onAssign={(t) => {
+            setTenant(t)
+            setShowAssignTenant(false)
+          }}
+          onClose={() => setShowAssignTenant(false)}
         />
       )}
 
