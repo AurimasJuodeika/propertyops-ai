@@ -118,3 +118,51 @@ ${agencyName}`
 
   return sendEmail({ to: tenant.email, subject, message })
 }
+
+// ── Contractor job assignment ─────────────────────────────────────────────────
+export async function sendContractorAssignment({ contractor, job, property, agencyName = 'Harrington & Co' }) {
+  const subject = `New Job Assignment — ${job.title} — ${property.address}`
+  const message = `Dear ${contractor.contact},
+
+You have been assigned a new maintenance job by ${agencyName}.
+
+JOB DETAILS
+Property: ${property.address}, ${property.postcode}
+Job: ${job.title}
+Priority: ${job.priority.toUpperCase()}
+Description: ${job.description}
+${job.dueDate ? `Due Date: ${job.dueDate}` : ''}
+${job.estimatedCost ? `Estimated Cost: £${job.estimatedCost}` : ''}
+
+Please contact the tenant to arrange access at your earliest convenience.
+
+To confirm this job, reply to this email or call us on 020 7123 4567.
+
+Kind regards,
+${agencyName}`
+
+  return sendEmail({ to: contractor.email, subject, message })
+}
+
+// ── Job completion notification to landlord ───────────────────────────────────
+export async function sendJobCompletionToLandlord({ landlord, job, property, contractor, agencyName = 'Harrington & Co' }) {
+  const subject = `Maintenance Completed — ${job.title} — ${property.address}`
+  const message = `Dear ${landlord.name},
+
+We are pleased to confirm that the following maintenance job at your property has been completed.
+
+Property: ${property.address}, ${property.postcode}
+Job: ${job.title}
+Completed by: ${contractor?.name || 'Our contractor'}
+${job.actualCost ? `Final Cost: £${job.actualCost}` : job.estimatedCost ? `Estimated Cost: £${job.estimatedCost}` : ''}
+
+No further action is required from you at this time.
+
+If you have any questions, please don't hesitate to contact us.
+
+Kind regards,
+${agencyName}
+020 7123 4567`
+
+  return sendEmail({ to: landlord.email, subject, message })
+}

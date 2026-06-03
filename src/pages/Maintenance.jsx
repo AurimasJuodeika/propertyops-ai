@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Wrench, AlertTriangle, Clock, CheckCircle, Plus, Zap, Filter, ChevronRight, User, Calendar, PoundSterling } from 'lucide-react'
-import { MAINTENANCE_JOBS, getPropertyById, getContractorById, MAINTENANCE_BY_MONTH } from '../data/mockData'
+import { Wrench, AlertTriangle, CheckCircle, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail } from 'lucide-react'
+import { MAINTENANCE_JOBS, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { sendMaintenanceUpdate, sendContractorAssignment, sendJobCompletionToLandlord } from '../lib/email'
 
 const PRIORITY_CONFIG = {
   emergency: { label: 'Emergency', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
@@ -20,8 +21,52 @@ const STATUS_CONFIG = {
 
 export default function Maintenance() {
   const [priorityFilter, setPriorityFilter] = useState('All')
-  const [statusFilter, setStatusFilter] = useState('All')
-  const [expandedJob, setExpandedJob] = useState(null)
+  const [statusFilter, setStatusFilter]     = useState('All')
+  const [expandedJob, setExpandedJob]       = useState(null)
+  const [sending, setSending]               = useState(null) // jobId currently sending
+  const [sentMap, setSentMap]               = useState({})   // { jobId_action: true }
+
+  const markSent = (key) => {
+    setSentMap(m => ({ ...m, [key]: true }))
+    setTimeout(() => setSentMap(m => { const n = { ...m }; delete n[key]; return n }), 3000)
+  }
+
+  const handleNotifyTenant = async (job) => {
+    const property = getPropertyById(job.propertyId)
+    const tenant   = getTenantById(property?.tenantId)
+    if (!tenant?.email) { alert('No email address for tenant.'); return }
+    setSending(job.id + '_tenant')
+    try {
+      await sendMaintenanceUpdate({ tenant, job, property })
+      markSent(job.id + '_tenant')
+    } catch (e) { alert('Failed: ' + e.message) }
+    setSending(null)
+  }
+
+  const handleNotifyContractor = async (job) => {
+    const property   = getPropertyById(job.propertyId)
+    const contractor = getContractorById(job.assignedTo)
+    if (!contractor?.email) { alert('No email for contractor.'); return }
+    setSending(job.id + '_contractor')
+    try {
+      await sendContractorAssignment({ contractor, job, property })
+      markSent(job.id + '_contractor')
+    } catch (e) { alert('Failed: ' + e.message) }
+    setSending(null)
+  }
+
+  const handleNotifyLandlord = async (job) => {
+    const property   = getPropertyById(job.propertyId)
+    const landlord   = getLandlordById(property?.landlordId)
+    const contractor = getContractorById(job.assignedTo)
+    if (!landlord?.email) { alert('No email for landlord.'); return }
+    setSending(job.id + '_landlord')
+    try {
+      await sendJobCompletionToLandlord({ landlord, job, property, contractor })
+      markSent(job.id + '_landlord')
+    } catch (e) { alert('Failed: ' + e.message) }
+    setSending(null)
+  }
 
   const filtered = MAINTENANCE_JOBS.filter(j => {
     const matchPriority = priorityFilter === 'All' || j.priority === priorityFilter
@@ -191,10 +236,50 @@ export default function Maintenance() {
                     <p style={{ fontSize: 12.5, color: '#e2e8f0', lineHeight: 1.6 }}>{job.aiTriage}</p>
                   </div>
                   <div style={{ gridColumn: 'span 2', display: 'flex', gap: 8 }}>
-                    <button className="btn-secondary" style={{ fontSize: 12 }}>View Property</button>
-                    <button className="btn-secondary" style={{ fontSize: 12 }}>Contact Tenant</button>
+                    {/* Notify tenant */}
+                    <button
+                      className="btn-secondary"
+                      style={{ fontSize: 12 }}
+                      disabled={sending === job.id + '_tenant'}
+                      onClick={() => handleNotifyTenant(job)}>
+                      {sentMap[job.id + '_tenant']
+                        ? <><CheckCircle size={12} color="#10b981" /> Tenant Notified</>
+                        : sending === job.id + '_tenant'
+                        ? 'Sending…'
+                        : <><Mail size={12} /> Notify Tenant</>}
+                    </button>
+
+                    {/* Notify contractor */}
+                    {contractor && (
+                      <button
+                        className="btn-secondary"
+                        style={{ fontSize: 12 }}
+                        disabled={sending === job.id + '_contractor'}
+                        onClick={() => handleNotifyContractor(job)}>
+                        {sentMap[job.id + '_contractor']
+                          ? <><CheckCircle size={12} color="#10b981" /> Sent</>
+                          : sending === job.id + '_contractor'
+                          ? 'Sending…'
+                          : <><Mail size={12} /> Email Contractor</>}
+                      </button>
+                    )}
+
+                    {/* Notify landlord on completion */}
+                    {job.status === 'completed' && (
+                      <button
+                        className="btn-secondary"
+                        style={{ fontSize: 12 }}
+                        disabled={sending === job.id + '_landlord'}
+                        onClick={() => handleNotifyLandlord(job)}>
+                        {sentMap[job.id + '_landlord']
+                          ? <><CheckCircle size={12} color="#10b981" /> Landlord Notified</>
+                          : sending === job.id + '_landlord'
+                          ? 'Sending…'
+                          : <><Mail size={12} /> Notify Landlord</>}
+                      </button>
+                    )}
+
                     {!contractor && <button className="btn-primary" style={{ fontSize: 12 }}><Plus size={12} /> Assign Contractor</button>}
-                    {job.status !== 'completed' && <button className="btn-secondary" style={{ fontSize: 12, marginLeft: 'auto', color: '#10b981', borderColor: '#bbf7d0' }}>Mark Complete</button>}
                   </div>
                 </div>
               )}
