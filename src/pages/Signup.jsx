@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Zap, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react'
-import { signUp, upsertProfile } from '../lib/auth'
+import { signUp } from '../lib/auth'
 import { isConfigured } from '../lib/supabase'
 
 const ROLES = [
@@ -53,21 +53,14 @@ export default function Signup() {
     setLoading(true)
     setError('')
     try {
-      const data = await signUp({
+      await signUp({
         email:      form.email,
         password:   form.password,
         fullName:   form.fullName,
         agencyName: form.agencyName,
         role:       form.role,
       })
-      if (data?.user) {
-        await upsertProfile(data.user.id, {
-          email:      form.email,
-          fullName:   form.fullName,
-          agencyName: form.agencyName,
-          role:       form.role,
-        })
-      }
+      // Profile is auto-created by Supabase trigger
       setSuccess(true)
     } catch (err) {
       setError(err.message || 'Sign up failed. Please try again.')
