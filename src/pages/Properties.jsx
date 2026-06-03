@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Search, ChevronRight, Users, ShieldCheck, AlertTriangle, Home, Plus, MapPin, BedDouble, Edit2, X, Save } from 'lucide-react'
-import { PROPERTIES, getLandlordById, getTenantById, getComplianceStatus, LANDLORDS } from '../data/mockData'
-import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getNewProperties, addNewProperty, getDeletedPropertyIds, removeNewProperty } from '../lib/propertyOverrides'
+import { PROPERTIES, getLandlordById, getTenantById, getComplianceStatus, LANDLORDS, TENANTS } from '../data/mockData'
+import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getNewProperties, addNewProperty, getDeletedPropertyIds, removeNewProperty, getAssignedTenantId, getCustomTenants } from '../lib/propertyOverrides'
 import RentEditModal from '../components/RentEditModal'
 import EditPropertyModal from '../components/EditPropertyModal'
 
@@ -245,6 +245,12 @@ export default function Properties() {
 
   const allProperties = [...PROPERTIES, ...newProperties].filter(p => !deletedIds.includes(p.id))
 
+  // Resolve tenant — checks assignment overrides + custom tenants
+  const resolveTenant = (p) => {
+    const assignedId = getAssignedTenantId(p.id) || p.tenantId
+    return [...TENANTS, ...getCustomTenants()].find(t => t.id === assignedId) || null
+  }
+
   const filtered = allProperties.filter(p => {
     const q = search.toLowerCase()
     const matchSearch = !q || p.address.toLowerCase().includes(q) || p.postcode.toLowerCase().includes(q)
@@ -326,7 +332,7 @@ export default function Properties() {
             <tbody>
               {filtered.map(p => {
                 const landlord   = getLandlordById(p.landlordId)
-                const tenant     = getTenantById(p.tenantId)
+                const tenant     = resolveTenant(p)
                 const compStatus = getComplianceStatus(p)
                 return (
                   <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/properties/${p.id}`)}>
@@ -396,7 +402,7 @@ export default function Properties() {
         <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>{filtered.length} properties</p>
         {filtered.map(p => {
           const landlord   = getLandlordById(p.landlordId)
-          const tenant     = getTenantById(p.tenantId)
+          const tenant     = resolveTenant(p)
           const compStatus = getComplianceStatus(p)
           return (
             <div key={p.id} onClick={() => navigate(`/properties/${p.id}`)}

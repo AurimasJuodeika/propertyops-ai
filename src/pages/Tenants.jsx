@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { User, CheckCircle, AlertTriangle, Clock, Plus, ChevronRight, Mail, Phone, Shield, X, Save } from 'lucide-react'
+import { User, CheckCircle, AlertTriangle, Clock, Plus, ChevronRight, Mail, Phone, Shield, X, Save, Edit2, Trash2 } from 'lucide-react'
 import { TENANTS, getPropertyById, getTenancyByPropertyId } from '../data/mockData'
 import { supabase, isConfigured } from '../lib/supabase'
+import { getCustomTenants, getAssignedTenantId } from '../lib/propertyOverrides'
 
 // ─── RTR Status config ────────────────────────────────────────────────────────
 const RTR_STATUSES = [
@@ -155,13 +156,26 @@ function RTRModal({ tenant, property, currentRTR, onSave, onClose }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function Tenants() {
-  const [search, setSearch]       = useState('')
-  const [overrides, setOverrides] = useState(getRTROverrides())
-  const [editing, setEditing]     = useState(null) // tenant being edited
+  const [search, setSearch]         = useState('')
+  const [overrides, setOverrides]   = useState(getRTROverrides())
+  const [editing, setEditing]       = useState(null)
+  const [editingTenant, setEditingTenant] = useState(null) // for edit custom tenant
+  const [customTenants, setCustomTenants] = useState(getCustomTenants())
 
-  const enriched = TENANTS.map(t => ({
+  // Merge mock + custom tenants
+  const allTenants = [...TENANTS, ...customTenants]
+
+  // Helper to find property including new ones from localStorage
+  const resolveProperty = (propertyId) => {
+    if (!propertyId) return null
+    const mock = getPropertyById(propertyId)
+    if (mock) return mock
+    try { return JSON.parse(localStorage.getItem('propertyops_new_properties') || '[]').find(p => p.id === propertyId) || null } catch { return null }
+  }
+
+  const enriched = allTenants.map(t => ({
     ...t,
-    property: getPropertyById(t.propertyId),
+    property: resolveProperty(t.propertyId),
     tenancy:  getTenancyByPropertyId(t.propertyId),
     rtr:      getRTRStatus(t, overrides),
   })).filter(t => {
@@ -293,7 +307,25 @@ export default function Tenants() {
                       ? <span style={{ fontWeight: 700, color: '#dc2626', fontSize: 13 }}>£{t.tenancy.arrears.toLocaleString()}</span>
                       : <span style={{ color: '#10b981', fontSize: 12, fontWeight: 600 }}>Clear</span>}
                   </td>
-                  <td><ChevronRight size={13} color="#cbd5e1" /></td>
+                  <td>
+                    <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      {t.isCustom && (
+                        <>
+                          <button onClick={e => { e.stopPropagation(); setEditingTenant(t) }}
+                            style={{ width:26, height:26, borderRadius:6, border:'1px solid #e2e8f0', background:'white', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
+                            title="Edit tenant">
+                            <Edit2 size={11} color="#64748b" />
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); if(confirm('Delete this tenant?')) { const updated = customTenants.filter(ct => ct.id !== t.id); localStorage.setItem('propertyops_custom_tenants', JSON.stringify(updated)); setCustomTenants(updated) } }}
+                            style={{ width:26, height:26, borderRadius:6, border:'1px solid #fecaca', background:'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
+                            title="Delete tenant">
+                            <Trash2 size={11} color="#dc2626" />
+                          </button>
+                        </>
+                      )}
+                      <ChevronRight size={13} color="#cbd5e1" />
+                    </div>
+                  </td>
                 </tr>
               )
             })}
@@ -358,6 +390,56 @@ export default function Tenants() {
           onClose={() => setEditing(null)}
         />
       )}
+
+      {/* Edit custom tenant modal */}
+      {editingTenant && (
+        <EditTenantModal
+          tenant={editingTenant}
+          onSave={(updated) => {
+            const all = customTenants.map(t => t.id === updated.id ? updated : t)
+            localStorage.setItem('propertyops_custom_tenants', JSON.stringify(all))
+            setCustomTenants(all)
+            setEditingTenant(null)
+          }}
+          onClose={() => setEditingTenant(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Edit Custom Tenant Modal ─────────────────────────────────────────────────
+function EditTenantModal({ tenant, onSave, onClose }) {
+  const [form, setForm] = useState({ name: tenant.name, email: tenant.email, phone: tenant.phone || '', nationality: tenant.nationality || 'British' })
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+  const inputStyle = { width:'100%', border:'1.5px solid #e2e8f0', borderRadius:9, padding:'10px 12px', fontSize:13.5, outline:'none', fontFamily:'inherit', color:'#0f172a', boxSizing:'border-box' }
+  const labelStyle = { display:'block', fontSize:11.5, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', letterSpacing:'0.05em', marginBottom:5 }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.7)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={onClose}>
+      <div style={{ background:'white', borderRadius:16, width:'100%', maxWidth:420, padding:24, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <h2 style={{ fontSize:17, fontWeight:800, color:'#0f172a' }}>Edit Tenant</h2>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer' }}><X size={17} color="#94a3b8" /></button>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:13 }}>
+          <div><label style={labelStyle}>Full Name</label><input value={form.name} onChange={set('name')} style={inputStyle} onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} /></div>
+          <div><label style={labelStyle}>Email</label><input type="email" value={form.email} onChange={set('email')} style={inputStyle} onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} /></div>
+          <div><label style={labelStyle}>Phone</label><input value={form.phone} onChange={set('phone')} style={inputStyle} onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} /></div>
+          <div>
+            <label style={labelStyle}>Nationality</label>
+            <select value={form.nationality} onChange={set('nationality')} style={{ ...inputStyle, cursor:'pointer' }}>
+              {['British','Irish','EU Pre-settled','EU Settled','Tier 2 Visa','Student Visa','Other'].map(n => <option key={n}>{n}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ display:'flex', gap:10, marginTop:20 }}>
+          <button className="btn-secondary" style={{ flex:1, justifyContent:'center' }} onClick={onClose}>Cancel</button>
+          <button className="btn-primary" style={{ flex:2, justifyContent:'center' }} onClick={() => onSave({ ...tenant, ...form })}>
+            <Save size={13} /> Save Changes
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
