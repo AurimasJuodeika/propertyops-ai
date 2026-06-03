@@ -68,6 +68,33 @@ export function setInspectionOverride(id, data) {
   localStorage.setItem(INSPECTION_KEY, JSON.stringify(all))
 }
 
+// ─── Tenant overrides per property ───────────────────────────────────────────
+const TENANT_ASSIGN_KEY = 'propertyops_tenant_assignments'
+export function getTenantAssignments() {
+  try { return JSON.parse(localStorage.getItem(TENANT_ASSIGN_KEY) || '{}') } catch { return {} }
+}
+export function assignTenantToProperty(propertyId, tenantId) {
+  const all = getTenantAssignments()
+  all[propertyId] = tenantId
+  localStorage.setItem(TENANT_ASSIGN_KEY, JSON.stringify(all))
+}
+export function getAssignedTenantId(propertyId) {
+  return getTenantAssignments()[propertyId] || null
+}
+
+// ─── Custom tenants created by users ─────────────────────────────────────────
+const CUSTOM_TENANTS_KEY = 'propertyops_custom_tenants'
+export function getCustomTenants() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_TENANTS_KEY) || '[]') } catch { return [] }
+}
+export function createCustomTenant(tenant) {
+  const all  = getCustomTenants()
+  const newT = { ...tenant, id: 'ct_' + Date.now(), isCustom: true, rtRVerified: false, rtRExpiry: null }
+  all.unshift(newT)
+  localStorage.setItem(CUSTOM_TENANTS_KEY, JSON.stringify(all))
+  return newT
+}
+
 // ─── New properties added by users ───────────────────────────────────────────
 const NEW_PROPS_KEY = 'propertyops_new_properties'
 export function getNewProperties() {

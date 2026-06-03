@@ -14,9 +14,170 @@ import {
 import PDFButton from '../components/PDFButton'
 import { generatePropertyReport } from '../lib/pdfExport'
 import RentEditModal from '../components/RentEditModal'
-import { getEffectiveRent, getPropertyOverrides, getRentHistory, getJobStatuses, setJobStatus, getEffectiveJobStatus, getInspectionOverrides, setInspectionOverride } from '../lib/propertyOverrides'
+import { getEffectiveRent, getPropertyOverrides, getRentHistory, getJobStatuses, setJobStatus, getEffectiveJobStatus, getInspectionOverrides, setInspectionOverride, getNewProperties, getAssignedTenantId, assignTenantToProperty, getTenantAssignments, getCustomTenants, createCustomTenant } from '../lib/propertyOverrides'
 import { getPayments, calculateArrears } from '../lib/payments'
 import { sendEmail } from '../lib/email'
+import { TENANTS } from '../data/mockData'
+
+// ─── Assign / Create Tenant Panel ────────────────────────────────────────────
+function AssignTenantPanel({ property, currentTenant, onAssign, onClose }) {
+  const [mode, setMode]       = useState(currentTenant ? 'manage' : 'search') // 'search' | 'create' | 'manage'
+  const [query, setQuery]     = useState('')
+  const [creating, setCreating] = useState(false)
+  const [newTenant, setNewTenant] = useState({ name:'', email:'', phone:'', nationality:'British' })
+
+  const allTenants = [...TENANTS, ...getCustomTenants()]
+  const results    = query.length > 1
+    ? allTenants.filter(t => t.name.toLowerCase().includes(query.toLowerCase()) || t.email.toLowerCase().includes(query.toLowerCase()))
+    : []
+
+  const handleCreate = () => {
+    if (!newTenant.name || !newTenant.email) { alert('Name and email are required.'); return }
+    const created = createCustomTenant({ ...newTenant, propertyId: property.id })
+    assignTenantToProperty(property.id, created.id)
+    onAssign(created)
+    onClose()
+  }
+
+  const handleSelect = (t) => {
+    assignTenantToProperty(property.id, t.id)
+    onAssign(t)
+    onClose()
+  }
+
+  const handleRemove = () => {
+    if (!confirm('Remove tenant from this property?')) return
+    assignTenantToProperty(property.id, null)
+    onAssign(null)
+    onClose()
+  }
+
+  const inputStyle = { width:'100%', border:'1.5px solid #e2e8f0', borderRadius:9, padding:'10px 12px', fontSize:13.5, outline:'none', fontFamily:'inherit', color:'#0f172a', boxSizing:'border-box' }
+  const labelStyle = { display:'block', fontSize:11.5, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', letterSpacing:'0.05em', marginBottom:5 }
+  const focus = e => e.target.style.borderColor = '#10b981'
+  const blur  = e => e.target.style.borderColor = '#e2e8f0'
+
+  return (
+    <div style={{ borderTop:'1px solid #f1f5f9', padding:'20px 24px', background:'#fafafa' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+        <p style={{ fontWeight:700, fontSize:15, color:'#0f172a' }}>
+          {currentTenant ? 'Manage Tenant' : 'Assign Tenant'}
+        </p>
+        <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}>
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* Current tenant management */}
+      {mode === 'manage' && currentTenant && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'white', borderRadius:10, border:'1px solid #e2e8f0', marginBottom:14 }}>
+            <div style={{ width:38, height:38, borderRadius:9, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight:800, fontSize:13, flexShrink:0 }}>
+              {currentTenant.name.split(' ').map(w=>w[0]).join('').slice(0,2)}
+            </div>
+            <div style={{ flex:1 }}>
+              <p style={{ fontWeight:700, fontSize:14, color:'#0f172a' }}>{currentTenant.name}</p>
+              <p style={{ fontSize:12, color:'#64748b' }}>{currentTenant.email} · {currentTenant.phone}</p>
+            </div>
+            <span className="badge badge-green">Current Tenant</span>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="btn-secondary" style={{ flex:1, justifyContent:'center', fontSize:13 }} onClick={() => setMode('search')}>
+              <Users size={13} /> Replace Tenant
+            </button>
+            <button className="btn-secondary" style={{ flex:1, justifyContent:'center', fontSize:13, color:'#dc2626', borderColor:'#fecaca' }} onClick={handleRemove}>
+              <X size={13} /> Remove Tenant
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Search existing */}
+      {mode === 'search' && (
+        <div>
+          <div style={{ marginBottom:14 }}>
+            <label style={labelStyle}>Search existing tenants</label>
+            <input value={query} onChange={e => setQuery(e.target.value)} autoFocus
+              placeholder="Name or email…"
+              style={inputStyle} onFocus={focus} onBlur={blur} />
+          </div>
+
+          {results.length > 0 && (
+            <div style={{ display:'flex', flexDirection:'column', gap:7, marginBottom:14 }}>
+              {results.slice(0,5).map(t => (
+                <button key={t.id} onClick={() => handleSelect(t)}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:9, border:'1.5px solid #e2e8f0', background:'white', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor='#10b981'; e.currentTarget.style.background='#f0fdf4' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.background='white' }}>
+                  <div style={{ width:32, height:32, borderRadius:8, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight:800, fontSize:11, flexShrink:0 }}>
+                    {t.name.split(' ').map(w=>w[0]).join('').slice(0,2)}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <p style={{ fontWeight:600, fontSize:13.5, color:'#0f172a' }}>{t.name}</p>
+                    <p style={{ fontSize:11.5, color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.email}</p>
+                  </div>
+                  {t.isCustom && <span className="badge badge-purple" style={{ flexShrink:0 }}>New</span>}
+                  <ChevronRight size={13} color="#cbd5e1" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {query.length > 1 && results.length === 0 && (
+            <p style={{ fontSize:13, color:'#94a3b8', marginBottom:14, fontStyle:'italic' }}>No tenants found matching "{query}"</p>
+          )}
+
+          <div style={{ display:'flex', gap:8, paddingTop:12, borderTop:'1px solid #f1f5f9' }}>
+            <button className="btn-primary" style={{ flex:1, justifyContent:'center', fontSize:13 }} onClick={() => setMode('create')}>
+              <Plus size={13} /> Create New Tenant
+            </button>
+            {currentTenant && (
+              <button className="btn-secondary" style={{ fontSize:13 }} onClick={() => setMode('manage')}>Cancel</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Create new tenant */}
+      {mode === 'create' && (
+        <div>
+          <p style={{ fontSize:13, color:'#64748b', marginBottom:14 }}>Create a new tenant and assign them to this property.</p>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            <div>
+              <label style={labelStyle}>Full Name *</label>
+              <input value={newTenant.name} onChange={e => setNewTenant(t => ({ ...t, name:e.target.value }))}
+                placeholder="e.g. James Smith" style={inputStyle} onFocus={focus} onBlur={blur} />
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <div>
+                <label style={labelStyle}>Email *</label>
+                <input type="email" value={newTenant.email} onChange={e => setNewTenant(t => ({ ...t, email:e.target.value }))}
+                  placeholder="james@email.co.uk" style={inputStyle} onFocus={focus} onBlur={blur} />
+              </div>
+              <div>
+                <label style={labelStyle}>Phone</label>
+                <input value={newTenant.phone} onChange={e => setNewTenant(t => ({ ...t, phone:e.target.value }))}
+                  placeholder="07700 900 000" style={inputStyle} onFocus={focus} onBlur={blur} />
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Nationality</label>
+              <select value={newTenant.nationality} onChange={e => setNewTenant(t => ({ ...t, nationality:e.target.value }))} style={{ ...inputStyle, cursor:'pointer' }}>
+                {['British','Irish','EU Pre-settled','EU Settled','Tier 2 Visa','Student Visa','Other'].map(n => <option key={n}>{n}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8, marginTop:14 }}>
+            <button className="btn-secondary" style={{ flex:1, justifyContent:'center', fontSize:13 }} onClick={() => setMode('search')}>← Back</button>
+            <button className="btn-primary" disabled={creating} style={{ flex:2, justifyContent:'center', fontSize:13 }} onClick={handleCreate}>
+              <Save size={13} /> {creating ? 'Creating…' : 'Create & Assign Tenant'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const CERT_CONFIG = {
   epc:               { label: 'EPC',                icon: Leaf,        color: '#16a34a' },
@@ -54,6 +215,8 @@ export default function PropertyDetail() {
   const [aiLoading, setAiLoading]       = useState(false)
   const [rescheduleId, setRescheduleId] = useState(null)
   const [rescheduleDate, setRescheduleDate] = useState('')
+  const [showAssignTenant, setShowAssignTenant] = useState(false)
+  const [tenantAssignments, setTenantAssignments] = useState(getTenantAssignments ? getTenantAssignments() : {})
   const [bookingCert, setBookingCert]   = useState(null)
   const [bookingEmail, setBookingEmail] = useState('')
   const [bookingSending, setBookingSending] = useState(false)
@@ -62,7 +225,8 @@ export default function PropertyDetail() {
     try { return JSON.parse(localStorage.getItem(`propertyops_docs_${id}`) || '[]') } catch { return [] }
   })
 
-  const property = PROPERTIES.find(p => p.id === id)
+  // Find in mock data OR in user-created new properties
+  const property = PROPERTIES.find(p => p.id === id) || getNewProperties().find(p => p.id === id)
   if (!property) return (
     <div style={{ padding:40, textAlign:'center' }}>
       <p style={{ color:'#64748b' }}>Property not found.</p>
@@ -71,7 +235,10 @@ export default function PropertyDetail() {
   )
 
   const landlord    = getLandlordById(property.landlordId)
-  const tenant      = getTenantById(property.tenantId)
+  // Tenant: check assignment override first, then property's default tenantId, then custom tenants
+  const assignedTenantId = getAssignedTenantId(property.id) || property.tenantId
+  const allTenants  = [...TENANTS, ...getCustomTenants()]
+  const tenant      = allTenants.find(t => t.id === assignedTenantId) || null
   const tenancy     = getTenancyByPropertyId(property.id)
   const jobs        = MAINTENANCE_JOBS.filter(j => j.propertyId === property.id)
   const inspections = INSPECTIONS.filter(i => i.propertyId === property.id)
@@ -274,6 +441,9 @@ export default function PropertyDetail() {
                     <AlertTriangle size={24} color="#d97706" style={{ margin:'0 auto 8px' }} />
                     <p style={{ fontWeight:700, color:'#92400e', fontSize:13.5 }}>Property is Void</p>
                     <p style={{ fontSize:12, color:'#b45309', marginTop:4 }}>No active tenant. Market to minimise void period.</p>
+                    <button className="btn-primary" style={{ marginTop:10, width:'100%', justifyContent:'center', background:'#d97706', boxShadow:'none', fontSize:12 }} onClick={() => setTab('tenancy')}>
+                      <Users size={12} /> Assign Tenant →
+                    </button>
                   </div>
                 )}
               </div>
@@ -394,6 +564,9 @@ export default function PropertyDetail() {
                           <AlertTriangle size={13} /> View Arrears Case
                         </button>
                       )}
+                      <button className="btn-secondary" style={{ justifyContent:'center' }} onClick={() => setShowAssignTenant(v => !v)}>
+                        <Users size={13} /> {showAssignTenant ? 'Close' : 'Change Tenant'}
+                      </button>
                     </div>
                   </div>
 
@@ -424,9 +597,23 @@ export default function PropertyDetail() {
               ) : (
                 <div style={{ textAlign:'center', padding:40 }}>
                   <FileText size={40} color="#e2e8f0" style={{ margin:'0 auto 12px' }} />
-                  <p style={{ fontWeight:700, color:'#64748b' }}>No active tenancy</p>
-                  <button className="btn-primary" style={{ marginTop:16 }} onClick={() => navigate('/tenancies')}><Plus size={13} /> Create Tenancy</button>
+                  <p style={{ fontWeight:700, color:'#64748b' }}>No tenant assigned</p>
+                  <p style={{ fontSize:13, color:'#94a3b8', marginTop:4 }}>Assign an existing tenant or create a new one.</p>
+                  <button className="btn-primary" style={{ marginTop:14 }} onClick={() => setShowAssignTenant(v => !v)}><Plus size={13} /> Assign Tenant</button>
                 </div>
+              )}
+
+              {/* Assign Tenant inline panel */}
+              {showAssignTenant && (
+                <AssignTenantPanel
+                  property={property}
+                  currentTenant={tenant}
+                  onAssign={(t) => {
+                    setTenantAssignments(getTenantAssignments())
+                    setShowAssignTenant(false)
+                  }}
+                  onClose={() => setShowAssignTenant(false)}
+                />
               )}
             </div>
           )}
