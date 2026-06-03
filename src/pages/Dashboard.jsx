@@ -17,6 +17,7 @@ import {
   ACTIVITY_FEED, RENT_COLLECTION_CHART, BRANCH_PERFORMANCE,
   STAFF, getComplianceSummary, getTotalArrears, getArrearsTenancies
 } from '../data/mockData'
+import { getAllStoredTasks } from '../lib/taskStore'
 import { useAuth } from '../context/AuthContext'
 
 // ─── Role config ────────────────────────────────────────────────────────────
@@ -209,8 +210,20 @@ function OwnerDashboard({ data }) {
   const emergencyJobs = openJobs.filter(j => j.priority === 'emergency')
   const overdueTasksCount = TASKS.filter(t => t.status === 'overdue').length
 
-  // Today's priorities — specific actionable items
+  // Pull overdue/critical stored tasks into priorities
+  const storedTaskPriorities = getAllStoredTasks()
+    .filter(t => !['completed','cancelled'].includes(t.status) &&
+      (t.priority === 'critical' || (t.dueDate && new Date(t.dueDate) < new Date())))
+    .slice(0, 2)
+    .map(t => ({
+      type: 'task', severity: t.priority === 'critical' ? 'critical' : 'warning',
+      title: t.title, sub: t.propertyAddress || (t.dueDate ? `Due ${new Date(t.dueDate).toLocaleDateString('en-GB')}` : 'No due date'),
+      link: '/tasks'
+    }))
+
+  // Today's priorities — specific actionable items (include stored tasks)
   const todayPriorities = [
+    ...storedTaskPriorities,
     ...openJobs.filter(j => j.priority === 'emergency' || j.priority === 'urgent').slice(0, 2).map(j => ({
       type: 'maintenance', severity: j.priority === 'emergency' ? 'critical' : 'warning',
       title: j.title, sub: j.tenantName, link: '/maintenance'
