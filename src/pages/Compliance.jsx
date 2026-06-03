@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ShieldCheck, AlertTriangle, Clock, CheckCircle, Zap, ChevronRight, Flame, Zap as ElecIcon, Leaf, Wind, Shield, CreditCard } from 'lucide-react'
-import { PROPERTIES, getLandlordById } from '../data/mockData'
+import { PROPERTIES, getLandlordById, getComplianceStatus } from '../data/mockData'
+import { getNewProperties, getDeletedPropertyIds } from '../lib/propertyOverrides'
 import PDFButton from '../components/PDFButton'
 import { generateComplianceReport } from '../lib/pdfExport'
 
@@ -58,24 +59,28 @@ export default function Compliance() {
   const [filter, setFilter] = useState('All')
   const [certType, setCertType] = useState('All')
 
+  // Merge mock + wizard-created properties (excluding deleted)
+  const deleted      = getDeletedPropertyIds()
+  const allProperties = [...PROPERTIES, ...getNewProperties()].filter(p => !deleted.includes(p.id))
+
   // Build compliance summary per cert type
   const summary = CERT_TYPES.map(ct => {
-    const props = PROPERTIES.filter(p => p.status !== 'void')
-    const statuses = props.map(p => p.compliance[ct.key]?.status)
+    const props    = allProperties.filter(p => p.status !== 'void')
+    const statuses = props.map(p => p.compliance?.[ct.key]?.status).filter(Boolean)
     return {
       ...ct,
-      expired: statuses.filter(s => s === 'expired' || s === 'not_verified' || s === 'overdue').length,
+      expired:  statuses.filter(s => s === 'expired' || s === 'not_verified' || s === 'overdue' || s === 'missing').length,
       expiring: statuses.filter(s => s === 'expiring_soon').length,
-      valid: statuses.filter(s => s === 'valid').length,
+      valid:    statuses.filter(s => s === 'valid').length,
     }
   })
 
-  // Build property compliance rows
-  const rows = PROPERTIES.map(p => {
+  // Build property compliance rows — all properties
+  const rows = allProperties.map(p => {
     const landlord = getLandlordById(p.landlordId)
-    const certs = CERT_TYPES.map(ct => ({ ...ct, status: p.compliance[ct.key]?.status, expiry: p.compliance[ct.key]?.expiry || p.compliance[ct.key]?.lastCheck }))
-    const hasCritical = certs.some(c => ['expired','not_verified','overdue'].includes(c.status))
-    const hasWarning = certs.some(c => c.status === 'expiring_soon')
+    const certs = CERT_TYPES.map(ct => ({ ...ct, status: p.compliance?.[ct.key]?.status || 'missing', expiry: p.compliance?.[ct.key]?.expiry || p.compliance?.[ct.key]?.lastCheck }))
+    const hasCritical = certs.some(c => ['expired','not_verified','overdue','missing'].includes(c.status))
+    const hasWarning  = certs.some(c => c.status === 'expiring_soon')
     const risk = hasCritical ? 'critical' : hasWarning ? 'warning' : 'compliant'
     return { ...p, certs, risk, landlord }
   })

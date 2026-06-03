@@ -19,6 +19,7 @@ import {
   STAFF, getComplianceSummary, getTotalArrears, getArrearsTenancies
 } from '../data/mockData'
 import { getAllStoredTasks } from '../lib/taskStore'
+import { getNewProperties, getDeletedPropertyIds } from '../lib/propertyOverrides'
 import { useAuth } from '../context/AuthContext'
 
 // ─── Role config ────────────────────────────────────────────────────────────
@@ -190,7 +191,7 @@ function OwnerDashboard({ data }) {
     try {
       const text = await generateWeeklySummary({
         agencyName: 'Harrington & Co',
-        properties: PROPERTIES,
+        properties: allProperties,
         tenancies:  TENANCIES,
         jobs:       MAINTENANCE_JOBS,
         inspections: INSPECTIONS,
@@ -204,7 +205,12 @@ function OwnerDashboard({ data }) {
     setAiLoading(false)
   }
   const { props, jobs, inspections, tenancies } = data
-  const compliance = getComplianceSummary()
+
+  // All properties including wizard-created (for compliance + scan)
+  const _deleted     = getDeletedPropertyIds()
+  const allProperties = [...PROPERTIES, ...getNewProperties()].filter(p => !_deleted.includes(p.id))
+
+  const compliance   = getComplianceSummary(allProperties)
   const totalArrears = getTotalArrears()
   const arrearsTenancies = getArrearsTenancies()
   const overdueInspections = INSPECTIONS.filter(i => i.status === 'overdue')
@@ -309,7 +315,7 @@ function OwnerDashboard({ data }) {
         <KPICard label="Compliance Risks" value={compliance.expired + compliance.expiringSoon} sub={`${compliance.expired} expired`} icon={ShieldCheck} color="red" alert onClick={() => navigate('/compliance')} />
         <KPICard label="Inspections Due" value={overdueInspections.length} sub="overdue" icon={ClipboardCheck} color="amber" alert onClick={() => navigate('/inspections')} />
         <KPICard label="Open Maintenance" value={openJobs.length} sub={`${emergencyJobs.length} emergency`} icon={Wrench} color="amber" onClick={() => navigate('/maintenance')} />
-        <KPICard label="Properties" value={PROPERTIES.filter(p => p.status === 'let').length} sub={`${PROPERTIES.filter(p => p.status === 'void').length} void`} icon={Building2} color="blue" trend={2.4} onClick={() => navigate('/properties')} />
+        <KPICard label="Properties" value={allProperties.filter(p => p.status === 'let').length} sub={`${allProperties.filter(p => p.status === 'void').length} void`} icon={Building2} color="blue" trend={2.4} onClick={() => navigate('/properties')} />
         <KPICard label="Active Tenancies" value={tenancies.filter(t => t.status === 'active').length} sub="2 ending soon" icon={Users} color="green" trend={1.2} onClick={() => navigate('/tenancies')} />
       </div>
 

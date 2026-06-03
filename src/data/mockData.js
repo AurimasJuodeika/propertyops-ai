@@ -593,19 +593,24 @@ export function getComplianceStatus(property) {
   return 'compliant'
 }
 
-export function getComplianceSummary() {
-  const expired = PROPERTIES.filter(p => {
+// allProps: pass merged array to include wizard-created properties; defaults to mock PROPERTIES
+export function getComplianceSummary(allProps) {
+  const props = allProps || PROPERTIES
+  const expired = props.filter(p => {
     const c = p.compliance
-    return [c.epc, c.gasSafety, c.eicr].some(x => x.status === 'expired') ||
-      c.smokeAlarm.status === 'overdue' || c.rightToRent.status === 'not_verified'
+    if (!c) return false
+    return [c.epc, c.gasSafety, c.eicr].some(x => x && (x.status === 'expired' || x.status === 'missing')) ||
+      (c.smokeAlarm && c.smokeAlarm.status === 'overdue') ||
+      (c.rightToRent && c.rightToRent.status === 'not_verified')
   }).length
-  const expiringSoon = PROPERTIES.filter(p => {
+  const expiringSoon = props.filter(p => {
     const c = p.compliance
-    return !([c.epc, c.gasSafety, c.eicr].some(x => x.status === 'expired')) &&
-      ([c.epc, c.gasSafety, c.eicr, c.rightToRent].some(x => x.status === 'expiring_soon'))
+    if (!c) return false
+    return !([c.epc, c.gasSafety, c.eicr].some(x => x && (x.status === 'expired' || x.status === 'missing'))) &&
+      ([c.epc, c.gasSafety, c.eicr, c.rightToRent].some(x => x && x.status === 'expiring_soon'))
   }).length
-  const compliant = PROPERTIES.length - expired - expiringSoon
-  return { expired, expiringSoon, compliant, total: PROPERTIES.length }
+  const compliant = props.length - expired - expiringSoon
+  return { expired, expiringSoon, compliant, total: props.length }
 }
 
 export function getTotalArrears() {

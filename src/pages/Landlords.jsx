@@ -4,7 +4,7 @@ import { LANDLORDS, PROPERTIES, TENANCIES } from '../data/mockData'
 import PDFButton from '../components/PDFButton'
 import { generateLandlordStatement } from '../lib/pdfExport'
 import { sendLandlordUpdate } from '../lib/email'
-import { getPropertyOverrides, setPropertyOverride, getLandlordOverrides, setLandlordOverride, getNewProperties, addNewProperty, removeNewProperty, getEffectiveRent } from '../lib/propertyOverrides'
+import { getPropertyOverrides, setPropertyOverride, getLandlordOverrides, setLandlordOverride, getNewProperties, addNewProperty, removeNewProperty, getEffectiveRent, getCustomLandlords, getDeletedPropertyIds } from '../lib/propertyOverrides'
 import RentEditModal from '../components/RentEditModal'
 
 // ─── Rent Edit Modal ──────────────────────────────────────────────────────────
@@ -172,11 +172,36 @@ Harrington & Co Property Management` : ''
     return baseProps
   }
 
-  const enrichedLandlords = LANDLORDS.map(l => ({
-    ...l,
-    propertyList: getPropertyList(l),
-    totalRent: getPropertyList(l).reduce((s, p) => s + getEffectiveRent(p), 0),
-  }))
+  // All landlords: mock + wizard-created + future added
+  const customLandlords = getCustomLandlords()
+  const deleted         = getDeletedPropertyIds()
+  const allNewProps     = getNewProperties().filter(p => !deleted.includes(p.id))
+  const allProperties   = [...PROPERTIES, ...allNewProps]
+
+  // For custom landlords, derive their property list from all properties
+  const getCustomPropertyList = (landlordId) => {
+    return allProperties.filter(p => p.landlordId === landlordId)
+  }
+
+  const enrichedLandlords = [
+    // Mock landlords (existing logic)
+    ...LANDLORDS.map(l => ({
+      ...l,
+      propertyList: getPropertyList(l),
+      totalRent: getPropertyList(l).reduce((s, p) => s + getEffectiveRent(p), 0),
+      isCustom: false,
+    })),
+    // Custom/wizard-created landlords
+    ...customLandlords.map(l => {
+      const props = getCustomPropertyList(l.id)
+      return {
+        ...l,
+        propertyList: props,
+        totalRent: props.reduce((s, p) => s + getEffectiveRent(p), 0),
+        isCustom: true,
+      }
+    }),
+  ]
 
   const handleSendUpdate = async () => {
     if (!selected?.email) { alert('No email address for this landlord.'); return }
@@ -229,7 +254,7 @@ Harrington & Co Property Management` : ''
       <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h1 className="page-title">Landlords</h1>
-          <p className="page-subtitle">{LANDLORDS.length} landlords · {LANDLORDS.filter(l => l.type === 'Portfolio' || l.type === 'Investor').length} portfolio landlords</p>
+          <p className="page-subtitle">{enrichedLandlords.length} landlords · {enrichedLandlords.filter(l => l.type === 'Portfolio' || l.type === 'Investor').length} portfolio landlords{customLandlords.length > 0 ? ` · ${customLandlords.length} added` : ''}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn-secondary" onClick={() => { if (!selected) { alert('Select a landlord first.'); return } setShowAIUpdate(true) }}><Zap size={13} /> Send AI Update</button>
@@ -251,7 +276,8 @@ Harrington & Co Property Management` : ''
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <p style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5 }}>{l.name}</p>
-                    <span className={`badge ${l.type === 'Investor' ? 'badge-purple' : l.type === 'Portfolio' ? 'badge-blue' : 'badge-slate'}`}>{l.type}</span>
+                    <span className={`badge ${l.type === 'Investor' ? 'badge-purple' : l.type === 'Portfolio' ? 'badge-blue' : 'badge-slate'}`}>{l.type || 'Individual'}</span>
+                    {l.isCustom && <span className="badge badge-green" style={{ fontSize: 10 }}>Added</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 14, marginTop: 5, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
