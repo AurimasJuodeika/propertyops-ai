@@ -5,6 +5,7 @@ import {
   ClipboardCheck, FileText, CheckCircle, Clock, Bell,
   ChevronRight, Check, Trash2, Filter
 } from 'lucide-react'
+import { useThemeColors } from '../context/ThemeContext'
 
 const ALL_NOTIFICATIONS = [
   // Critical compliance
@@ -128,6 +129,7 @@ const severityStyle = {
 
 export default function NotificationsPanel({ onClose }) {
   const navigate = useNavigate()
+  const t = useThemeColors()
   const [notifications, setNotifications] = useState(ALL_NOTIFICATIONS)
   const [group, setGroup] = useState('All')
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
@@ -166,15 +168,16 @@ export default function NotificationsPanel({ onClose }) {
       {/* Panel */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 420,
-        background: 'white', zIndex: 49, display: 'flex', flexDirection: 'column',
-        boxShadow: '-8px 0 40px rgba(0,0,0,0.12)',
+        background: t.bgCard, zIndex: 49, display: 'flex', flexDirection: 'column',
+        boxShadow: '-8px 0 40px rgba(0,0,0,0.25)',
+        borderLeft: `1px solid ${t.border}`,
       }}>
         {/* Header */}
-        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${t.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Bell size={18} color="#0f172a" />
-              <span style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>Notifications</span>
+              <Bell size={18} color={t.textPrimary} />
+              <span style={{ fontSize: 16, fontWeight: 800, color: t.textPrimary }}>Notifications</span>
               {unreadCount > 0 && (
                 <span style={{ background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 800, padding: '2px 7px', borderRadius: 10 }}>
                   {unreadCount}
@@ -189,8 +192,8 @@ export default function NotificationsPanel({ onClose }) {
                 </button>
               )}
               <button onClick={onClose}
-                style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <X size={14} color="#64748b" />
+                style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${t.border}`, background: t.bgCardAlt, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <X size={14} color={t.textSecondary} />
               </button>
             </div>
           </div>
@@ -232,22 +235,22 @@ export default function NotificationsPanel({ onClose }) {
         </div>
 
         {/* Filter row */}
-        <div style={{ padding: '10px 20px', borderBottom: '1px solid #f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>{filtered.length} notification{filtered.length !== 1 ? 's' : ''}</span>
+        <div style={{ padding: '10px 20px', borderBottom: `1px solid ${t.borderSubtle}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, color: t.textMuted }}>{filtered.length} notification{filtered.length !== 1 ? 's' : ''}</span>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={showUnreadOnly} onChange={e => setShowUnreadOnly(e.target.checked)}
               style={{ accentColor: '#10b981', width: 13, height: 13 }} />
-            <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Unread only</span>
+            <span style={{ fontSize: 12, color: t.textSecondary, fontWeight: 500 }}>Unread only</span>
           </label>
         </div>
 
         {/* Notifications list */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', background: t.bgCard }}>
           {filtered.length === 0 ? (
             <div style={{ padding: 48, textAlign: 'center' }}>
               <CheckCircle size={40} color="#10b981" style={{ margin: '0 auto 12px' }} />
-              <p style={{ fontWeight: 700, color: '#334155', fontSize: 15 }}>All caught up!</p>
-              <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>No notifications to show.</p>
+              <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: 15 }}>All caught up!</p>
+              <p style={{ fontSize: 13, color: t.textMuted, marginTop: 4 }}>No notifications to show.</p>
             </div>
           ) : (
             <>
@@ -287,10 +290,10 @@ export default function NotificationsPanel({ onClose }) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: 8 }}>
+        <div style={{ padding: '12px 20px', borderTop: `1px solid ${t.border}`, display: 'flex', gap: 8, background: t.bgCard }}>
           <button
             onClick={() => { navigate('/tasks'); onClose() }}
-            style={{ flex: 1, padding: '9px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151', fontFamily: 'inherit' }}>
+            style={{ flex: 1, padding: '9px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bgCardAlt, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: t.textSecondary, fontFamily: 'inherit' }}>
             View All Tasks
           </button>
           <button
@@ -306,6 +309,7 @@ export default function NotificationsPanel({ onClose }) {
 
 function NotifItem({ notif, onAction, onRead, onDismiss }) {
   const [hovered, setHovered] = useState(false)
+  const t = useThemeColors()
   const s = severityStyle[notif.severity]
   const Icon = notif.icon
 
@@ -315,10 +319,9 @@ function NotifItem({ notif, onAction, onRead, onDismiss }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         padding: '12px 20px', cursor: 'pointer',
-        background: notif.read ? 'white' : s.bg,
-        borderBottom: '1px solid #f8fafc',
+        background: hovered ? t.bgHover : notif.read ? t.bgCard : t.bgCard,
+        borderBottom: `1px solid ${t.borderSubtle}`,
         transition: 'background 0.15s',
-        ...(hovered && { background: '#f8fafc' }),
       }}
       onClick={() => onAction(notif)}
     >
@@ -334,12 +337,12 @@ function NotifItem({ notif, onAction, onRead, onDismiss }) {
         {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 3 }}>
-            <p style={{ fontSize: 13, fontWeight: notif.read ? 500 : 700, color: '#0f172a', lineHeight: 1.3, flex: 1 }}>{notif.title}</p>
+            <p style={{ fontSize: 13, fontWeight: notif.read ? 500 : 700, color: t.textPrimary, lineHeight: 1.3, flex: 1 }}>{notif.title}</p>
             <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8, background: s.labelBg, color: s.labelColor, flexShrink: 0, marginTop: 1 }}>
               {notif.group}
             </span>
           </div>
-          <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginBottom: 7 }}>{notif.body}</p>
+          <p style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.5, marginBottom: 7 }}>{notif.body}</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
@@ -350,13 +353,13 @@ function NotifItem({ notif, onAction, onRead, onDismiss }) {
               {!notif.read && (
                 <button
                   onClick={e => { e.stopPropagation(); onRead(notif.id) }}
-                  style={{ fontSize: 11.5, fontWeight: 600, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '3px 6px' }}>
+                  style={{ fontSize: 11.5, fontWeight: 600, color: t.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '3px 6px' }}>
                   Mark read
                 </button>
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, color: '#cbd5e1' }}>{notif.time}</span>
+              <span style={{ fontSize: 11, color: t.textMuted }}>{notif.time}</span>
               <button
                 onClick={e => { e.stopPropagation(); onDismiss(notif.id) }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: hovered ? 1 : 0, transition: 'opacity 0.15s' }}>
