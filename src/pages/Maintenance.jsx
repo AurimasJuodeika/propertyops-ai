@@ -320,8 +320,9 @@ export default function Maintenance() {
                     </span>
                   )}
                   {!contractor && job.status === 'new' && (
-                    <button className="btn-primary" style={{ fontSize: 11.5, padding: '5px 10px' }} onClick={e => e.stopPropagation()}>
-                      Assign
+                    <button className="btn-primary" style={{ fontSize: 11.5, padding: '5px 10px' }}
+                      onClick={e => { e.stopPropagation(); setExpandedJob(expandedJob === job.id ? null : job.id) }}>
+                      Assign ↓
                     </button>
                   )}
                   <ChevronRight size={14} color="#cbd5e1" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: '0.2s' }} />
