@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Save, TrendingUp, TrendingDown } from 'lucide-react'
 import { setPropertyOverride, getPropertyOverrides, getEffectiveRent } from '../lib/propertyOverrides'
 
@@ -35,11 +36,11 @@ export default function RentEditModal({ property, onSave, onClose, anchorRect })
     onClose()
   }
 
-  // Render as popover anchored to button, or centred modal as fallback
+  // Render as popover anchored to button — using portal so position:fixed is relative to viewport
   if (anchorRect) {
-    return (
+    return createPortal(
       <>
-        {/* Invisible backdrop to catch outside clicks */}
+        {/* Invisible backdrop */}
         <div style={{ position: 'fixed', inset: 0, zIndex: 69 }} onClick={onClose} />
         <div
           ref={popoverRef}
@@ -57,7 +58,8 @@ export default function RentEditModal({ property, onSave, onClose, anchorRect })
         >
           <PopoverContent property={property} currentRent={currentRent} rent={rent} setRent={setRent} reason={reason} setReason={setReason} change={change} changePct={changePct} handleSave={handleSave} onClose={onClose} />
         </div>
-      </>
+      </>,
+      document.body
     )
   }
 
@@ -215,22 +217,25 @@ function PopoverContent({ property, currentRent, rent, setRent, reason, setReaso
   )
 }
 
-// ─── Position popover near trigger ───────────────────────────────────────────
+// ─── Position popover right next to the trigger button ───────────────────────
 function getPopoverPosition(rect) {
   const popoverWidth  = 340
-  const popoverHeight = 320 // approx
-  const padding       = 8
+  const popoverHeight = 370
+  const gap           = 6   // px gap between button and popover
   const viewport      = { w: window.innerWidth, h: window.innerHeight }
 
-  // Try to appear to the left of the button first, then right
-  let left = rect.left - popoverWidth - padding
-  if (left < padding) left = rect.right + padding
-  if (left + popoverWidth > viewport.w - padding) left = viewport.w - popoverWidth - padding
+  // Prefer left of button; fall back to right
+  let left = rect.left - popoverWidth - gap
+  if (left < 8) left = rect.right + gap
+  // Clamp to viewport
+  left = Math.max(8, Math.min(left, viewport.w - popoverWidth - 8))
 
-  // Vertically align to button, but keep within viewport
+  // Vertically: align top of popover with top of button
   let top = rect.top
-  if (top + popoverHeight > viewport.h - padding) top = viewport.h - popoverHeight - padding
-  if (top < padding) top = padding
+  // If it overflows bottom, shift up
+  if (top + popoverHeight > viewport.h - 8) top = rect.bottom - popoverHeight
+  // Clamp to viewport
+  top = Math.max(8, Math.min(top, viewport.h - popoverHeight - 8))
 
   return { top, left }
 }
