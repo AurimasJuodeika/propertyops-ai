@@ -14,7 +14,8 @@ import {
 import PDFButton from '../components/PDFButton'
 import { generatePropertyReport } from '../lib/pdfExport'
 import RentEditModal from '../components/RentEditModal'
-import { getEffectiveRent, getPropertyOverrides, getRentHistory, getJobStatuses, setJobStatus, getEffectiveJobStatus, getInspectionOverrides, setInspectionOverride, getNewProperties, getAssignedTenantId, assignTenantToProperty, getTenantAssignments, getCustomTenants, createCustomTenant } from '../lib/propertyOverrides'
+import EditPropertyModal from '../components/EditPropertyModal'
+import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getRentHistory, getJobStatuses, setJobStatus, getEffectiveJobStatus, getInspectionOverrides, setInspectionOverride, getNewProperties, getAssignedTenantId, assignTenantToProperty, getTenantAssignments, getCustomTenants, createCustomTenant } from '../lib/propertyOverrides'
 import { getPayments, calculateArrears } from '../lib/payments'
 import { sendEmail } from '../lib/email'
 import { TENANTS } from '../data/mockData'
@@ -206,7 +207,11 @@ export default function PropertyDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [tab, setTab]                   = useState('overview')
-  const [editingRent, setEditingRent]   = useState(null)
+  const [editingRent, setEditingRent]     = useState(null)
+  const [editingProperty, setEditingProperty] = useState(null)
+  const [propertyData, setPropertyData] = useState(() => getEffectiveProperty(
+    PROPERTIES.find(p => p.id === id) || getNewProperties().find(p => p.id === id) || {}
+  ))
   const [rentOverride, setRentOverride] = useState(getPropertyOverrides())
   const [jobStatuses, setJobStatuses]   = useState(getJobStatuses())
   const [inspOverrides, setInspOverrides] = useState(getInspectionOverrides())
@@ -330,6 +335,7 @@ export default function PropertyDetail() {
               </div>
             </div>
             <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+              <button className="btn-secondary" onClick={e => setEditingProperty({ property, anchorRect: e.currentTarget.getBoundingClientRect() })}><Edit2 size={13} /> Edit Property</button>
               <button className="btn-secondary" onClick={e => setEditingRent({ property, anchorRect: e.currentTarget.getBoundingClientRect() })}><Edit2 size={13} /> Edit Rent</button>
               <PDFButton label="Property Report" onGenerate={() => generatePropertyReport(property, landlord, tenant, tenancy, jobs, inspections)} />
               <button className="btn-primary" onClick={handleAISummary} disabled={aiLoading}>
@@ -794,6 +800,20 @@ export default function PropertyDetail() {
           )}
         </div>
       </div>
+
+      {/* Edit property modal */}
+      {editingProperty && (
+        <EditPropertyModal
+          property={editingProperty.property}
+          anchorRect={editingProperty.anchorRect}
+          onSave={() => {
+            setPropertyData(getEffectiveProperty(property))
+            setEditingProperty(null)
+          }}
+          onDelete={() => navigate('/properties')}
+          onClose={() => setEditingProperty(null)}
+        />
+      )}
 
       {/* Rent edit popover */}
       {editingRent && (

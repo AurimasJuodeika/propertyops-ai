@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Search, ChevronRight, Users, ShieldCheck, AlertTriangle, Home, Plus, MapPin, BedDouble, Edit2, X, Save } from 'lucide-react'
 import { PROPERTIES, getLandlordById, getTenantById, getComplianceStatus, LANDLORDS } from '../data/mockData'
-import { getEffectiveRent, getPropertyOverrides, getNewProperties, addNewProperty } from '../lib/propertyOverrides'
+import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getNewProperties, addNewProperty, getDeletedPropertyIds, removeNewProperty } from '../lib/propertyOverrides'
 import RentEditModal from '../components/RentEditModal'
+import EditPropertyModal from '../components/EditPropertyModal'
 
 const STATUS_LABELS = { let: 'Let', available: 'Available', void: 'Void', under_offer: 'Under Offer' }
 const STATUS_BADGE  = { let: 'badge-green', available: 'badge-blue', void: 'badge-amber', under_offer: 'badge-purple' }
@@ -235,12 +236,14 @@ export default function Properties() {
   const [search, setSearch]             = useState('')
   const [branchFilter, setBranchFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
-  const [editingRent, setEditingRent]   = useState(null)
-  const [rentOverrides, setRentOverrides] = useState(getPropertyOverrides())
-  const [showAdd, setShowAdd]           = useState(null) // anchorRect | null
-  const [newProperties, setNewProperties] = useState(getNewProperties())
+  const [editingRent, setEditingRent]       = useState(null)
+  const [editingProperty, setEditingProperty] = useState(null)
+  const [rentOverrides, setRentOverrides]   = useState(getPropertyOverrides())
+  const [showAdd, setShowAdd]               = useState(null)
+  const [newProperties, setNewProperties]   = useState(getNewProperties())
+  const [deletedIds, setDeletedIds]         = useState(getDeletedPropertyIds())
 
-  const allProperties = [...PROPERTIES, ...newProperties]
+  const allProperties = [...PROPERTIES, ...newProperties].filter(p => !deletedIds.includes(p.id))
 
   const filtered = allProperties.filter(p => {
     const q = search.toLowerCase()
@@ -362,7 +365,16 @@ export default function Properties() {
                     <td style={{ fontSize: 12.5, color: '#334155' }}>{landlord?.name}</td>
                     <td style={{ fontSize: 12, color: '#64748b' }}>{MGMT_LABELS[p.managementType]}</td>
                     <td><span className={`badge ${COMPLIANCE_BADGE[compStatus]}`}>{COMPLIANCE_LABEL[compStatus]}</span></td>
-                    <td><ChevronRight size={14} color="#cbd5e1" /></td>
+                    <td>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <button onClick={e => { e.stopPropagation(); setEditingProperty({ property: p, anchorRect: e.currentTarget.getBoundingClientRect() }) }}
+                          title="Edit property"
+                          style={{ width:26, height:26, borderRadius:6, border:'1px solid #e2e8f0', background:'white', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                          <Edit2 size={12} color="#64748b" />
+                        </button>
+                        <ChevronRight size={14} color="#cbd5e1" />
+                      </div>
+                    </td>
                   </tr>
                 )
               })}
@@ -432,6 +444,17 @@ export default function Properties() {
           )
         })}
       </div>
+
+      {/* Edit property modal */}
+      {editingProperty && (
+        <EditPropertyModal
+          property={editingProperty.property}
+          anchorRect={editingProperty.anchorRect}
+          onSave={() => { setRentOverrides(getPropertyOverrides()); setEditingProperty(null) }}
+          onDelete={() => { setDeletedIds(getDeletedPropertyIds()); setNewProperties(getNewProperties()); setEditingProperty(null) }}
+          onClose={() => setEditingProperty(null)}
+        />
+      )}
 
       {/* Add property — anchored popover */}
       {showAdd && (

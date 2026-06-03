@@ -7,6 +7,43 @@ export function getEffectiveRent(property) {
   return overrides[property.id]?.rent ?? property.rent
 }
 
+// ─── Get effective property (merges all field overrides) ─────────────────────
+export function getEffectiveProperty(property) {
+  const overrides = getPropertyOverrides()
+  const o = overrides[property.id] || {}
+  return {
+    ...property,
+    ...(o.address    ? { address:    o.address    } : {}),
+    ...(o.city       ? { city:       o.city       } : {}),
+    ...(o.postcode   ? { postcode:   o.postcode   } : {}),
+    ...(o.type       ? { type:       o.type       } : {}),
+    ...(o.bedrooms   ? { bedrooms:   o.bedrooms   } : {}),
+    ...(o.bathrooms  ? { bathrooms:  o.bathrooms  } : {}),
+    ...(o.status     ? { status:     o.status     } : {}),
+    ...(o.branch     ? { branch:     o.branch     } : {}),
+    ...(o.managementType ? { managementType: o.managementType } : {}),
+    ...(o.landlordId ? { landlordId: o.landlordId } : {}),
+    rent: getEffectiveRent(property),
+  }
+}
+
+// ─── Soft-delete a property ───────────────────────────────────────────────────
+const DELETED_KEY = 'propertyops_deleted_properties'
+export function getDeletedPropertyIds() {
+  try { return JSON.parse(localStorage.getItem(DELETED_KEY) || '[]') } catch { return [] }
+}
+export function deleteProperty(propertyId) {
+  const all = getDeletedPropertyIds()
+  if (!all.includes(propertyId)) {
+    all.push(propertyId)
+    localStorage.setItem(DELETED_KEY, JSON.stringify(all))
+  }
+}
+export function restoreProperty(propertyId) {
+  const all = getDeletedPropertyIds().filter(id => id !== propertyId)
+  localStorage.setItem(DELETED_KEY, JSON.stringify(all))
+}
+
 // ─── Get rent history for a property ─────────────────────────────────────────
 export function getRentHistory(propertyId) {
   const overrides = getPropertyOverrides()
