@@ -105,6 +105,33 @@ export function setInspectionOverride(id, data) {
   localStorage.setItem(INSPECTION_KEY, JSON.stringify(all))
 }
 
+// ─── Custom landlords ─────────────────────────────────────────────────────────
+const CUSTOM_LANDLORDS_KEY = 'propertyops_custom_landlords'
+export function getCustomLandlords() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_LANDLORDS_KEY) || '[]') } catch { return [] }
+}
+export function addCustomLandlord(landlord) {
+  const all = getCustomLandlords()
+  const newL = {
+    ...landlord,
+    id: 'cl_' + Date.now(),
+    isCustom: true,
+    properties: [],
+    balance: 0,
+    rating: 5,
+    statementFrequency: 'monthly',
+    preferredContact: 'email',
+    createdAt: new Date().toISOString(),
+  }
+  all.unshift(newL)
+  localStorage.setItem(CUSTOM_LANDLORDS_KEY, JSON.stringify(all))
+  return newL
+}
+export function updateCustomLandlord(id, updates) {
+  const all = getCustomLandlords().map(l => l.id === id ? { ...l, ...updates } : l)
+  localStorage.setItem(CUSTOM_LANDLORDS_KEY, JSON.stringify(all))
+}
+
 // ─── Tenant overrides per property ───────────────────────────────────────────
 const TENANT_ASSIGN_KEY = 'propertyops_tenant_assignments'
 export function getTenantAssignments() {

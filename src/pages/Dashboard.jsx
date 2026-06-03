@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import PropertyOnboardingWizard from '../components/PropertyOnboardingWizard'
 import AnimatedCounter from '../components/AnimatedCounter'
 import { useThemeColors } from '../context/ThemeContext'
 import { generateWeeklySummary, isAIConfigured } from '../lib/ai'
 import {
   AlertTriangle, TrendingUp, Building2, ClipboardCheck, Wrench,
   PoundSterling, ShieldCheck, Users, Zap, ArrowUp, ArrowDown,
-  Clock, CheckCircle, AlertCircle, BarChart3, Star, FileText
+  Clock, CheckCircle, AlertCircle, BarChart3, Star, FileText, Plus
 } from 'lucide-react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -175,9 +176,10 @@ function ActivityItem({ item }) {
 // ─── Role-specific dashboards ────────────────────────────────────────────────
 
 function OwnerDashboard({ data }) {
-  const [aiOpen, setAiOpen]       = useState(false)
-  const [aiText, setAiText]       = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
+  const [aiOpen, setAiOpen]         = useState(false)
+  const [aiText, setAiText]         = useState('')
+  const [aiLoading, setAiLoading]   = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
   const navigate = useNavigate()
   const t = useThemeColors()
 
@@ -254,6 +256,7 @@ function OwnerDashboard({ data }) {
   const priorityBg = { critical: '#fef2f2', warning: '#fffbeb' }
 
   return (
+    <>
     <div>
       {/* Today's Priorities */}
       <div style={{ marginBottom: 24 }}>
@@ -264,10 +267,16 @@ function OwnerDashboard({ data }) {
               Demo snapshot: Thursday, 5 June 2025 · {todayPriorities.filter(p => p.severity === 'critical').length} critical, {todayPriorities.filter(p => p.severity === 'warning').length} need attention
             </p>
           </div>
-          <button onClick={() => navigate('/tasks')}
-            style={{ fontSize: 12.5, fontWeight: 600, color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-            View all tasks →
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button onClick={() => setShowWizard(true)}
+              style={{ fontSize: 12.5, fontWeight: 600, color: '#10b981', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Plus size={12} /> New Property
+            </button>
+            <button onClick={() => navigate('/tasks')}
+              style={{ fontSize: 12.5, fontWeight: 600, color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+              View all tasks →
+            </button>
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {todayPriorities.map((p, i) => {
@@ -419,6 +428,18 @@ function OwnerDashboard({ data }) {
         </div>
       </div>
     </div>
+
+    {/* Property Onboarding Wizard — portal renders outside div so wrap in fragment */}
+    {showWizard && (
+      <PropertyOnboardingWizard
+        onComplete={(newProp) => {
+          setShowWizard(false)
+          navigate(`/properties/${newProp.id}`)
+        }}
+        onClose={() => setShowWizard(false)}
+      />
+    )}
+    </>
   )
 }
 

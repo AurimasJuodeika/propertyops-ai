@@ -6,6 +6,7 @@ import { PROPERTIES, getLandlordById, getTenantById, getComplianceStatus, LANDLO
 import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getNewProperties, addNewProperty, getDeletedPropertyIds, removeNewProperty, getAssignedTenantId, getCustomTenants } from '../lib/propertyOverrides'
 import RentEditModal from '../components/RentEditModal'
 import EditPropertyModal from '../components/EditPropertyModal'
+import PropertyOnboardingWizard from '../components/PropertyOnboardingWizard'
 
 const STATUS_LABELS = { let: 'Let', available: 'Available', void: 'Void', under_offer: 'Under Offer' }
 const STATUS_BADGE  = { let: 'badge-green', available: 'badge-blue', void: 'badge-amber', under_offer: 'badge-purple' }
@@ -239,7 +240,8 @@ export default function Properties() {
   const [editingRent, setEditingRent]       = useState(null)
   const [editingProperty, setEditingProperty] = useState(null)
   const [rentOverrides, setRentOverrides]   = useState(getPropertyOverrides())
-  const [showAdd, setShowAdd]               = useState(null)
+  const [showAdd, setShowAdd]               = useState(null)  // anchorRect for old modal (kept for compat)
+  const [showWizard, setShowWizard]         = useState(false)
   const [newProperties, setNewProperties]   = useState(getNewProperties())
   const [deletedIds, setDeletedIds]         = useState(getDeletedPropertyIds())
 
@@ -270,7 +272,7 @@ export default function Properties() {
           <h1 className="page-title">Properties</h1>
           <p className="page-subtitle">{allProperties.length} managed · {allProperties.filter(p => p.status === 'let').length} let · {allProperties.filter(p => p.status === 'void').length} void</p>
         </div>
-        <button className="btn-primary" onClick={e => setShowAdd(e.currentTarget.getBoundingClientRect())}><Plus size={14} /> Add Property</button>
+        <button className="btn-primary" onClick={() => setShowWizard(true)}><Plus size={14} /> Add Property</button>
       </div>
 
       {/* Filters */}
@@ -462,12 +464,15 @@ export default function Properties() {
         />
       )}
 
-      {/* Add property — anchored popover */}
-      {showAdd && (
-        <AddPropertyModal
-          anchorRect={showAdd}
-          onSave={() => { setNewProperties(getNewProperties()); setShowAdd(null) }}
-          onClose={() => setShowAdd(null)}
+      {/* Property Onboarding Wizard */}
+      {showWizard && (
+        <PropertyOnboardingWizard
+          onComplete={(newProp) => {
+            setNewProperties(getNewProperties())
+            setShowWizard(false)
+            navigate(`/properties/${newProp.id}`)
+          }}
+          onClose={() => setShowWizard(false)}
         />
       )}
 
