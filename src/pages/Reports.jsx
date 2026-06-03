@@ -36,7 +36,7 @@ export default function Reports() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <PDFButton label="Export Management Summary" onGenerate={() => generateManagementSummary({ properties: PROPERTIES, tenancies: TENANCIES, maintenanceJobs: MAINTENANCE_JOBS, inspections: INSPECTIONS, branchPerformance: BRANCH_PERFORMANCE, rentChart: RENT_COLLECTION_CHART })} />
-          <button className="btn-primary"><Zap size={13} /> Insights</button>
+          <button className="btn-primary" onClick={() => document.getElementById('insights-section')?.scrollIntoView({ behavior:'smooth' })}>↓ Jump to Insights</button>
         </div>
       </div>
 
@@ -193,14 +193,14 @@ export default function Reports() {
         </table>
       </div>
 
-      {/* AI Insights */}
-      <div className="card" style={{ padding: 20, background: 'linear-gradient(135deg,#0f172a,#1e293b)' }}>
+      {/* Performance Insights */}
+      <div id="insights-section" className="card" style={{ padding: 20, background: 'linear-gradient(135deg,#0f172a,#1e293b)' }}>
         <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Zap size={16} color="white" />
           </div>
           <div>
-            <p style={{ color: '#10b981', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>AI Performance Insights — February 2025</p>
+            <p style={{ color: '#10b981', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Performance Insights — Demo Snapshot: February 2025</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               {[
                 { title: 'Rent Collection Decline', body: 'Collection rate has dropped from 99.2% in December to 85.8% in February — a 13.4% decline. 4 new arrears cases contribute £21,250. Recommend immediate action on stage 2/3 cases.' },

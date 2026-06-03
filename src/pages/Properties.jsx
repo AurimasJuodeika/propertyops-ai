@@ -268,7 +268,7 @@ export default function Properties() {
       <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h1 className="page-title">Properties</h1>
-          <p className="page-subtitle">{PROPERTIES.length} managed · {PROPERTIES.filter(p => p.status === 'let').length} let · {PROPERTIES.filter(p => p.status === 'void').length} void</p>
+          <p className="page-subtitle">{allProperties.length} managed · {allProperties.filter(p => p.status === 'let').length} let · {allProperties.filter(p => p.status === 'void').length} void</p>
         </div>
         <button className="btn-primary" onClick={e => setShowAdd(e.currentTarget.getBoundingClientRect())}><Plus size={14} /> Add Property</button>
       </div>
@@ -297,7 +297,7 @@ export default function Properties() {
           { label: 'Total Managed',     value: allProperties.length,                                                    icon: Building2,     color: '#6366f1' },
           { label: 'Currently Let',     value: allProperties.filter(p => p.status === 'let').length,                   icon: Home,          color: '#10b981' },
           { label: 'Void',              value: allProperties.filter(p => p.status === 'void').length,                  icon: AlertTriangle, color: '#f59e0b' },
-          { label: 'Compliance Issues', value: PROPERTIES.filter(p => getComplianceStatus(p) === 'critical').length,   icon: ShieldCheck,   color: '#dc2626' },
+          { label: 'Compliance Issues', value: allProperties.filter(p => getComplianceStatus(p) === 'critical').length, icon: ShieldCheck,   color: '#dc2626' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16 }}>
             <div style={{ width: 38, height: 38, borderRadius: 9, background: `${s.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

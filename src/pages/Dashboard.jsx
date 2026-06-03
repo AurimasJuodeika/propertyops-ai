@@ -248,7 +248,7 @@ function OwnerDashboard({ data }) {
           <div>
             <h2 style={{ fontSize: 16, fontWeight: 800, color: t.textPrimary, letterSpacing: '-0.2px' }}>Today's Priorities</h2>
             <p style={{ fontSize: 12.5, color: t.textMuted, marginTop: 2 }}>
-              {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · {todayPriorities.filter(p => p.severity === 'critical').length} critical, {todayPriorities.filter(p => p.severity === 'warning').length} need attention
+              Demo snapshot: Thursday, 5 June 2025 · {todayPriorities.filter(p => p.severity === 'critical').length} critical, {todayPriorities.filter(p => p.severity === 'warning').length} need attention
             </p>
           </div>
           <button onClick={() => navigate('/tasks')}
@@ -380,7 +380,7 @@ function OwnerDashboard({ data }) {
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ color: '#10b981', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-              AI Weekly Management Summary {isAIConfigured && <span style={{ color: '#059669' }}>· Live</span>}
+              Weekly Management Summary {isAIConfigured && <span style={{ color: '#059669' }}>· Auto-generated</span>}
             </p>
             {aiOpen ? (
               <div>

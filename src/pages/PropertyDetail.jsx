@@ -225,6 +225,12 @@ export default function PropertyDetail() {
   const [bookingEmail, setBookingEmail] = useState('')
   const [bookingSending, setBookingSending] = useState(false)
   const [bookingSent, setBookingSent]   = useState(false)
+  const [downloadToast, setDownloadToast] = useState('')
+  const handleDocDownload = (docName) => {
+    setDownloadToast(docName)
+    setTimeout(() => setDownloadToast(''), 2500)
+  }
+
   const [uploadedDocs, setUploadedDocs] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`propertyops_docs_${id}`) || '[]') } catch { return [] }
   })
@@ -560,7 +566,8 @@ export default function PropertyDetail() {
                       <button className="btn-secondary" style={{ justifyContent:'center' }} onClick={async () => {
                         if (!landlord?.email) { alert('No landlord email.'); return }
                         await sendEmail({ to: landlord.email, subject: `Tenancy Renewal — ${property.address}`, message: `Dear ${landlord.name},\n\nThe tenancy at ${property.address} is due to end on ${new Date(tenancy.endDate).toLocaleDateString('en-GB')}.\n\nWe recommend offering a renewal to ${tenant?.name}. Please confirm if you would like to proceed.\n\nHarrington & Co · 020 7123 4567` })
-                        alert('Renewal notification sent to landlord!')
+                        setDownloadToast('renewal_sent')
+        setTimeout(() => setDownloadToast(''), 3000)
                       }}>
                         <Mail size={13} /> Notify Landlord of Renewal
                       </button>
@@ -783,8 +790,8 @@ export default function PropertyDetail() {
                     <p style={{ fontSize:11, color:'#94a3b8' }}>{doc.date} · {doc.type} · {doc.size}</p>
                     <div style={{ display:'flex', gap:6, marginTop:'auto' }}>
                       <button style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:4, background:'none', border:'1px solid #e2e8f0', borderRadius:6, padding:'5px 8px', cursor:'pointer', fontSize:11.5, fontWeight:600, color:'#64748b', fontFamily:'inherit' }}
-                        onClick={() => alert(`In production: downloads ${doc.name} from Supabase Storage.`)}>
-                        <Download size={11} /> Download
+                        onClick={() => handleDocDownload(doc.name)}>
+                        <Download size={11} /> {downloadToast === doc.name ? '✓ Preparing…' : 'Download'}
                       </button>
                       {!doc.default && (
                         <button style={{ width:28, height:28, background:'#fef2f2', border:'1px solid #fecaca', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
@@ -813,6 +820,18 @@ export default function PropertyDetail() {
           onDelete={() => navigate('/properties')}
           onClose={() => setEditingProperty(null)}
         />
+      )}
+
+      {/* Toast notification */}
+      {downloadToast && downloadToast !== 'renewal_sent' && (
+        <div style={{ position:'fixed', bottom:90, left:'50%', transform:'translateX(-50%)', background:'#0f172a', color:'white', padding:'10px 20px', borderRadius:10, fontSize:13.5, fontWeight:600, zIndex:80, boxShadow:'0 8px 24px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:8 }}>
+          <CheckCircle size={15} color="#10b981" /> {downloadToast} — preview only in demo · real download needs Supabase Storage
+        </div>
+      )}
+      {downloadToast === 'renewal_sent' && (
+        <div style={{ position:'fixed', bottom:90, left:'50%', transform:'translateX(-50%)', background:'#0f172a', color:'white', padding:'10px 20px', borderRadius:10, fontSize:13.5, fontWeight:600, zIndex:80, boxShadow:'0 8px 24px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:8 }}>
+          <CheckCircle size={15} color="#10b981" /> Renewal notification sent to landlord
+        </div>
       )}
 
       {/* Rent edit popover */}

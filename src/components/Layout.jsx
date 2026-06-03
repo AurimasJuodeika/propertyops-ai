@@ -289,10 +289,10 @@ export default function Layout({ user, onLogout }) {
             {isDark ? '☀️' : '🌙'}
           </button>
 
-          {/* AI badge (desktop only) */}
-          <div className="ai-badge" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'linear-gradient(135deg,rgba(16,185,129,0.1),rgba(5,150,105,0.1))', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '6px 10px', flexShrink: 0 }}>
-            <Zap size={12} color="#10b981" />
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#059669' }}>AI Active</span>
+          {/* Demo badge (desktop only) */}
+          <div className="ai-badge" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8, padding: '6px 10px', flexShrink: 0 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6366f1' }}>Demo Mode</span>
           </div>
         </header>
 

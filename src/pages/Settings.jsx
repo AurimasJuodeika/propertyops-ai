@@ -56,7 +56,7 @@ export default function SettingsPage() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Settings</h1>
-        <p className="page-subtitle">Agency configuration, AI settings, users and notification preferences</p>
+        <p className="page-subtitle">Agency configuration, user roles and notification preferences</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20 }}>
