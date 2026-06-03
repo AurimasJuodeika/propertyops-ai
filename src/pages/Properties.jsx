@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Building2, Search, ChevronRight, Users, ShieldCheck, AlertTriangle, Home, Plus, MapPin, BedDouble, Edit2 } from 'lucide-react'
 import { PROPERTIES, getLandlordById, getTenantById, getComplianceStatus } from '../data/mockData'
 import { getEffectiveRent, getPropertyOverrides } from '../lib/propertyOverrides'
@@ -11,6 +12,7 @@ const COMPLIANCE_BADGE  = { critical: 'badge-red', warning: 'badge-amber', compl
 const COMPLIANCE_LABEL  = { critical: '⚠ Critical', warning: '⚠ Warning', compliant: '✓ OK', info: 'Void' }
 
 export default function Properties() {
+  const navigate = useNavigate()
   const [search, setSearch]             = useState('')
   const [branchFilter, setBranchFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -101,7 +103,7 @@ export default function Properties() {
                 const tenant     = getTenantById(p.tenantId)
                 const compStatus = getComplianceStatus(p)
                 return (
-                  <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => window.location.href = `/properties/${p.id}`}>
+                  <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/properties/${p.id}`)}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         <div style={{ width: 34, height: 34, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
@@ -162,7 +164,7 @@ export default function Properties() {
           const tenant     = getTenantById(p.tenantId)
           const compStatus = getComplianceStatus(p)
           return (
-            <div key={p.id} onClick={() => window.location.href = `/properties/${p.id}`}
+            <div key={p.id} onClick={() => navigate(`/properties/${p.id}`)}
               style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '14px 16px', cursor: 'pointer' }}>
 
               {/* Top row */}
