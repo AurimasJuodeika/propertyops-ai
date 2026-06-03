@@ -1,12 +1,32 @@
 import { useState } from 'react'
-import { Users, Star, PoundSterling, Building2, Plus, Zap, ChevronRight, Mail, Phone } from 'lucide-react'
+import { Users, Star, PoundSterling, Building2, Plus, Zap, ChevronRight, Mail, Phone, CheckCircle } from 'lucide-react'
 import { LANDLORDS, PROPERTIES, TENANCIES } from '../data/mockData'
 import PDFButton from '../components/PDFButton'
 import { generateLandlordStatement } from '../lib/pdfExport'
+import { sendLandlordUpdate } from '../lib/email'
 
 export default function Landlords() {
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected]     = useState(null)
   const [showAIUpdate, setShowAIUpdate] = useState(false)
+  const [sending, setSending]       = useState(false)
+  const [sent, setSent]             = useState(false)
+
+  const handleSendUpdate = async () => {
+    if (!selected?.email) { alert('No email address for this landlord.'); return }
+    setSending(true)
+    try {
+      await sendLandlordUpdate({
+        landlord:   selected,
+        properties: selected.propertyList,
+      })
+      setSent(true)
+      setTimeout(() => setSent(false), 3000)
+      setShowAIUpdate(false)
+    } catch (err) {
+      alert('Failed to send: ' + err.message)
+    }
+    setSending(false)
+  }
 
   const enriched = LANDLORDS.map(l => ({
     ...l,
@@ -178,7 +198,13 @@ Harrington & Co Property Management` : ''
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-secondary" onClick={() => setShowAIUpdate(false)} style={{ flex: 1, justifyContent: 'center' }}>Close</button>
-              <button className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}><Mail size={13} /> Send to Landlord</button>
+              <button
+                className="btn-primary"
+                disabled={sending}
+                onClick={handleSendUpdate}
+                style={{ flex: 2, justifyContent: 'center' }}>
+                {sent ? <><CheckCircle size={13} /> Sent!</> : sending ? 'Sending…' : <><Mail size={13} /> Send to Landlord</>}
+              </button>
             </div>
           </div>
         </div>

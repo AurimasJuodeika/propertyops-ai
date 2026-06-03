@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { PoundSterling, AlertTriangle, TrendingDown, Clock, Zap, Mail, Phone, FileText, ChevronDown, ChevronUp } from 'lucide-react'
+import { PoundSterling, AlertTriangle, TrendingDown, Clock, Zap, Mail, Phone, FileText, CheckCircle } from 'lucide-react'
 import { TENANCIES, getPropertyById, getTenantById, RENT_COLLECTION_CHART } from '../data/mockData'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { sendArrearsLetter } from '../lib/email'
 
 const ARREARS_STAGES = {
   stage1: { label: 'Stage 1 — Reminder', days: '7-14', color: '#f59e0b', bg: '#fffbeb' },
@@ -17,7 +18,26 @@ function getArrearStage(months) {
 
 export default function RentArrears() {
   const [selectedTenancy, setSelectedTenancy] = useState(null)
-  const [showAILetter, setShowAILetter] = useState(false)
+  const [showAILetter, setShowAILetter]         = useState(false)
+  const [sending, setSending]                   = useState(false)
+  const [sentId, setSentId]                     = useState(null)
+
+  const handleSendLetter = async (tenancy) => {
+    if (!tenancy?.tenant?.email) { alert('No email address for this tenant.'); return }
+    setSending(true)
+    try {
+      await sendArrearsLetter({
+        tenant:     tenancy.tenant,
+        property:   tenancy.property,
+        tenancy,
+      })
+      setSentId(tenancy.id)
+      setTimeout(() => setSentId(null), 3000)
+    } catch (err) {
+      alert('Failed to send email: ' + err.message)
+    }
+    setSending(false)
+  }
 
   const arrearsTenancies = TENANCIES
     .filter(t => t.arrears > 0)
@@ -212,8 +232,16 @@ Harrington & Co Property Management`
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-secondary" onClick={() => setShowAILetter(false)} style={{ flex: 1, justifyContent: 'center' }}>Close</button>
-              <button className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>
-                <Mail size={13} /> Send via Email
+              <button
+                className="btn-primary"
+                disabled={sending || !selectedTenancy}
+                onClick={() => selectedTenancy && handleSendLetter(selectedTenancy)}
+                style={{ flex: 2, justifyContent: 'center' }}>
+                {sentId === selectedTenancy?.id
+                  ? <><CheckCircle size={13} /> Sent!</>
+                  : sending
+                  ? 'Sending…'
+                  : <><Mail size={13} /> Send via Email</>}
               </button>
             </div>
           </div>
