@@ -36,7 +36,7 @@ export default function Reports() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <PDFButton label="Export Management Summary" onGenerate={() => generateManagementSummary({ properties: PROPERTIES, tenancies: TENANCIES, maintenanceJobs: MAINTENANCE_JOBS, inspections: INSPECTIONS, branchPerformance: BRANCH_PERFORMANCE, rentChart: RENT_COLLECTION_CHART })} />
-          <button className="btn-primary"><Zap size={13} /> AI Insights</button>
+          <button className="btn-primary"><Zap size={13} /> Insights</button>
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from '../components/AnimatedCounter'
 import { useThemeColors } from '../context/ThemeContext'
 import { generateWeeklySummary, isAIConfigured } from '../lib/ai'
@@ -14,7 +15,8 @@ import {
 import {
   PROPERTIES, TENANCIES, MAINTENANCE_JOBS, INSPECTIONS, TASKS,
   ACTIVITY_FEED, RENT_COLLECTION_CHART, BRANCH_PERFORMANCE,
-  STAFF, getComplianceSummary, getTotalArrears, getArrearsTenancies
+  STAFF, getComplianceSummary, getTotalArrears, getArrearsTenancies,
+  BIRMINGHAM_PROPERTIES, BIRMINGHAM_MAINTENANCE, BIRMINGHAM_INSPECTIONS
 } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 
@@ -104,10 +106,10 @@ function filterByRole(user) {
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
-function KPICard({ label, value, sub, icon: Icon, color, alert, trend }) {
+function KPICard({ label, value, sub, icon: Icon, color, alert, trend, onClick }) {
   const t = useThemeColors()
   return (
-    <div className="stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
+    <div className="stat-card" onClick={onClick} style={{ position: 'relative', overflow: 'hidden', cursor: onClick ? 'pointer' : 'default' }}>
       {alert && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: color === 'red' ? '#dc2626' : color === 'amber' ? '#f59e0b' : '#10b981' }} />
       )}
@@ -176,6 +178,13 @@ function OwnerDashboard({ data }) {
   const [aiOpen, setAiOpen]       = useState(false)
   const [aiText, setAiText]       = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const navigate = useNavigate()
+  const t = useThemeColors()
+
+  // Merge Birmingham data into totals
+  const allProperties   = [...PROPERTIES, ...BIRMINGHAM_PROPERTIES]
+  const allMaintenance  = [...MAINTENANCE_JOBS, ...BIRMINGHAM_MAINTENANCE]
+  const allInspections  = [...INSPECTIONS, ...BIRMINGHAM_INSPECTIONS]
 
   const handleAISummary = async () => {
     if (aiText) { setAiOpen(true); return }
@@ -197,37 +206,97 @@ function OwnerDashboard({ data }) {
     }
     setAiLoading(false)
   }
-  const t = useThemeColors()
   const { props, jobs, inspections, tenancies } = data
   const compliance = getComplianceSummary()
   const totalArrears = getTotalArrears()
   const arrearsTenancies = getArrearsTenancies()
-  const overdueInspections = inspections.filter(i => i.status === 'overdue')
-  const openJobs = jobs.filter(j => j.status !== 'completed')
-  const emergencyJobs = openJobs.filter(j => j.priority === 'emergency')
+  const allOverdueInspections = [...inspections, ...allInspections].filter(i => i.status === 'overdue')
+  const allOpenJobs = [...jobs, ...allMaintenance].filter(j => j.status !== 'completed')
+  const emergencyJobs = allOpenJobs.filter(j => j.priority === 'emergency')
+  const overdueInspections = allOverdueInspections
+  const openJobs = allOpenJobs
+  const overdueTasksCount = TASKS.filter(t => t.status === 'overdue').length
+
+  // Today's priorities — specific actionable items
+  const todayPriorities = [
+    ...allOpenJobs.filter(j => j.priority === 'emergency' || j.priority === 'urgent').slice(0, 2).map(j => ({
+      type: 'maintenance', severity: j.priority === 'emergency' ? 'critical' : 'warning',
+      title: j.title, sub: j.tenantName, link: '/maintenance'
+    })),
+    ...allOverdueInspections.slice(0, 2).map(i => ({
+      type: 'inspection', severity: 'warning',
+      title: `Inspection overdue — ${i.address?.split(',')[0]}`, sub: i.tenantName, link: '/inspections'
+    })),
+    ...arrearsTenancies.filter(t => t.arrears > 3000).slice(0, 1).map(t => ({
+      type: 'arrears', severity: 'warning',
+      title: `Rent arrears — ${t.tenant?.name}`, sub: `£${t.arrears?.toLocaleString()} outstanding`, link: '/rent-arrears'
+    })),
+    ...[
+      { type: 'compliance', severity: 'critical', title: 'Gas Safety expiring — 42 Moseley Road', sub: 'Expires 21 Jun 2025 · Book now', link: '/compliance' },
+      { type: 'compliance', severity: 'critical', title: 'EICR expired — 17 Balsall Heath Road', sub: 'Expired Dec 2024 · Immediate action', link: '/compliance' },
+      { type: 'compliance', severity: 'critical', title: 'RTR not verified — Precious Adeyemi', sub: '31 Handsworth Wood Road · £10,000 risk', link: '/tenants' },
+    ]
+  ].slice(0, 6)
+
   const PIE = [
     { name: 'Compliant', value: compliance.compliant, color: '#10b981' },
     { name: 'Expiring', value: compliance.expiringSoon, color: '#f59e0b' },
     { name: 'Critical', value: compliance.expired, color: '#ef4444' },
   ]
+
+  const priorityIcon = { maintenance: Wrench, inspection: ClipboardCheck, arrears: PoundSterling, compliance: ShieldCheck }
+  const priorityColor = { critical: '#dc2626', warning: '#d97706' }
+  const priorityBg = { critical: '#fef2f2', warning: '#fffbeb' }
+
   return (
     <div>
-      {/* Alerts */}
-      <div style={{ marginBottom: 20 }}>
-        <AlertBanner icon={AlertTriangle} severity="critical" message="CRITICAL: Gas Safety Certificate EXPIRED at 22A Upper Street, N1 0PQ" action="Resolve now" />
-        <AlertBanner icon={AlertTriangle} severity="critical" message="Right to Rent NOT VERIFIED — Kwame Mensah, 88 Finchley Road. £10,000 penalty risk." action="View" />
-        <AlertBanner icon={PoundSterling} severity="warning" message={`£${totalArrears.toLocaleString()} total rent arrears across ${arrearsTenancies.length} tenancies`} action="View arrears" />
-        <AlertBanner icon={Clock} severity="warning" message={`${overdueInspections.length} inspections overdue — earliest due December 2024`} action="View" />
+      {/* Today's Priorities */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div>
+            <h2 style={{ fontSize: 16, fontWeight: 800, color: t.textPrimary, letterSpacing: '-0.2px' }}>Today's Priorities</h2>
+            <p style={{ fontSize: 12.5, color: t.textMuted, marginTop: 2 }}>
+              {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · {todayPriorities.filter(p => p.severity === 'critical').length} critical, {todayPriorities.filter(p => p.severity === 'warning').length} need attention
+            </p>
+          </div>
+          <button onClick={() => navigate('/tasks')}
+            style={{ fontSize: 12.5, fontWeight: 600, color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+            View all tasks →
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {todayPriorities.map((p, i) => {
+            const Icon = priorityIcon[p.type] || AlertTriangle
+            return (
+              <button key={i} onClick={() => navigate(p.link)}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px',
+                  background: priorityBg[p.severity], border: `1px solid ${priorityColor[p.severity]}30`,
+                  borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                  borderLeft: `3px solid ${priorityColor[p.severity]}`, transition: 'opacity 0.15s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
+                <Icon size={15} color={priorityColor[p.severity]} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
+                  <p style={{ fontSize: 11.5, color: '#64748b', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.sub}</p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs — all clickable */}
       <div className="grid-cols-6" style={{ marginBottom: 24 }}>
-        <KPICard label="Overdue Rent" value={`£${totalArrears.toLocaleString()}`} sub={`${arrearsTenancies.length} tenancies`} icon={PoundSterling} color="red" alert />
-        <KPICard label="Compliance Risks" value={compliance.expired + compliance.expiringSoon} sub={`${compliance.expired} expired`} icon={ShieldCheck} color="red" alert />
-        <KPICard label="Inspections Due" value={overdueInspections.length} sub="overdue" icon={ClipboardCheck} color="amber" alert />
-        <KPICard label="Open Maintenance" value={openJobs.length} sub={`${emergencyJobs.length} emergency`} icon={Wrench} color="amber" />
-        <KPICard label="Properties Let" value={props.filter(p => p.status === 'let').length} sub={`${props.filter(p => p.status === 'void').length} void`} icon={Building2} color="blue" trend={2.4} />
-        <KPICard label="Active Tenancies" value={tenancies.filter(t => t.status === 'active').length} sub="2 ending soon" icon={Users} color="green" trend={1.2} />
+        <KPICard label="Overdue Rent" value={`£${totalArrears.toLocaleString()}`} sub={`${arrearsTenancies.length} tenancies`} icon={PoundSterling} color="red" alert onClick={() => navigate('/rent-arrears')} />
+        <KPICard label="Compliance Risks" value={compliance.expired + compliance.expiringSoon} sub={`${compliance.expired} expired`} icon={ShieldCheck} color="red" alert onClick={() => navigate('/compliance')} />
+        <KPICard label="Inspections Due" value={overdueInspections.length} sub="overdue" icon={ClipboardCheck} color="amber" alert onClick={() => navigate('/inspections')} />
+        <KPICard label="Open Maintenance" value={openJobs.length} sub={`${emergencyJobs.length} emergency`} icon={Wrench} color="amber" onClick={() => navigate('/maintenance')} />
+        <KPICard label="Properties" value={[...props, ...BIRMINGHAM_PROPERTIES].filter(p => p.status === 'let').length} sub={`${[...props, ...BIRMINGHAM_PROPERTIES].filter(p => p.status === 'void').length} void`} icon={Building2} color="blue" trend={2.4} onClick={() => navigate('/properties')} />
+        <KPICard label="Active Tenancies" value={tenancies.filter(t => t.status === 'active').length} sub="2 ending soon" icon={Users} color="green" trend={1.2} onClick={() => navigate('/tenancies')} />
       </div>
 
       {/* Charts row */}

@@ -564,7 +564,7 @@ export default function PropertyDetail() {
                       }}>
                         <Mail size={13} /> Notify Landlord of Renewal
                       </button>
-                      <button className="btn-secondary" style={{ justifyContent:'center' }} onClick={() => alert('In production: generates a tenancy agreement PDF from your template.')}>
+                      <button className="btn-secondary" style={{ justifyContent:'center' }} onClick={() => { setTab('documents') }}>
                         <Download size={13} /> Download Tenancy Agreement
                       </button>
                       {arrears > 0 && (

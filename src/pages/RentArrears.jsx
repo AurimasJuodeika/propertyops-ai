@@ -105,7 +105,7 @@ Harrington & Co Property Management`
           <p className="page-subtitle">Rent collection, arrears management and chase communications</p>
         </div>
         <button className="btn-primary" onClick={() => setShowAILetter(true)}>
-          <Zap size={13} /> Generate AI Letters
+          <Zap size={13} /> Generate Letters
         </button>
       </div>
 

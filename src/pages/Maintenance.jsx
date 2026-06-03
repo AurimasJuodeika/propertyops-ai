@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Wrench, AlertTriangle, CheckCircle, Clock, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail } from 'lucide-react'
-import { MAINTENANCE_JOBS, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH } from '../data/mockData'
+import { Wrench, AlertTriangle, CheckCircle, Clock, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail, Send } from 'lucide-react'
+import { MAINTENANCE_JOBS, BIRMINGHAM_MAINTENANCE, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH, getJobNotes, addJobNote } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sendMaintenanceUpdate, sendContractorAssignment, sendJobCompletionToLandlord } from '../lib/email'
+import { getEffectiveJobStatus, setJobStatus, getJobStatuses } from '../lib/propertyOverrides'
 import { triageMaintenanceJob, isAIConfigured } from '../lib/ai'
 
 const PRIORITY_CONFIG = {
@@ -24,6 +25,28 @@ export default function Maintenance() {
   const [priorityFilter, setPriorityFilter] = useState('All')
   const [statusFilter, setStatusFilter]     = useState('All')
   const [expandedJob, setExpandedJob]       = useState(null)
+  const [jobStatuses, setJobStatuses]       = useState(getJobStatuses())
+  const [noteText, setNoteText]             = useState({})
+  const [notesMap, setNotesMap]             = useState({})
+
+  // Merge all maintenance jobs
+  const ALL_JOBS = [...MAINTENANCE_JOBS, ...BIRMINGHAM_MAINTENANCE]
+
+  const handleStatusChange = (jobId, status) => {
+    setJobStatus(jobId, status)
+    setJobStatuses(getJobStatuses())
+  }
+
+  const handleAddNote = (jobId) => {
+    const text = noteText[jobId]?.trim()
+    if (!text) return
+    addJobNote(jobId, text)
+    setNotesMap(m => ({ ...m, [jobId]: getJobNotes(jobId) }))
+    setNoteText(t => ({ ...t, [jobId]: '' }))
+  }
+
+  const getStatus = (job) => jobStatuses[job.id]?.status ?? job.status
+  const getNotes  = (job) => notesMap[job.id] ?? getJobNotes(job.id)
   const [aiTriageMap, setAiTriageMap]       = useState({})
   const [triagingId, setTriagingId]         = useState(null)
 
@@ -83,15 +106,16 @@ export default function Maintenance() {
     setSending(null)
   }
 
-  const filtered = MAINTENANCE_JOBS.filter(j => {
+  const filtered = ALL_JOBS.filter(j => {
+    const status = getStatus(j)
     const matchPriority = priorityFilter === 'All' || j.priority === priorityFilter
-    const matchStatus = statusFilter === 'All' || j.status === statusFilter
+    const matchStatus   = statusFilter === 'All' || status === statusFilter
     return matchPriority && matchStatus
   })
 
-  const openJobs = MAINTENANCE_JOBS.filter(j => j.status !== 'completed')
+  const openJobs       = ALL_JOBS.filter(j => getStatus(j) !== 'completed')
   const emergencyCount = openJobs.filter(j => j.priority === 'emergency').length
-  const urgentCount = openJobs.filter(j => j.priority === 'urgent').length
+  const urgentCount    = openJobs.filter(j => j.priority === 'urgent').length
   const totalEstimated = openJobs.reduce((s, j) => s + (j.estimatedCost || 0), 0)
 
   return (
@@ -109,7 +133,7 @@ export default function Maintenance() {
               await new Promise(r => setTimeout(r, 500)) // 500ms between calls
             }
           }}>
-            <Zap size={13} /> {isAIConfigured ? 'AI Triage All (Live)' : 'AI Triage All'}
+            <Zap size={13} /> {'Triage All'}
           </button>
           <button className="btn-primary"><Plus size={13} /> Log Job</button>
         </div>
@@ -189,11 +213,13 @@ export default function Maintenance() {
       {/* Job list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.map(job => {
-          const property = getPropertyById(job.propertyId)
+          const property   = getPropertyById(job.propertyId)
           const contractor = getContractorById(job.assignedTo)
-          const pc = PRIORITY_CONFIG[job.priority]
-          const sc = STATUS_CONFIG[job.status]
+          const pc         = PRIORITY_CONFIG[job.priority]
+          const currentStatus = getStatus(job)
+          const sc         = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.new
           const isExpanded = expandedJob === job.id
+          const jobNotes   = getNotes(job)
 
           return (
             <div key={job.id} className="card" style={{ overflow: 'visible' }}>
@@ -320,6 +346,60 @@ export default function Maintenance() {
                     )}
 
                     {!contractor && <button className="btn-primary" style={{ fontSize: 12 }}><Plus size={12} /> Assign Contractor</button>}
+                  </div>
+
+                  {/* Status change */}
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 7 }}>Update Status</p>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {Object.entries(STATUS_CONFIG).map(([s, cfg]) => (
+                        <button key={s} onClick={() => handleStatusChange(job.id, s)}
+                          style={{ padding: '4px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit', background: currentStatus === s ? '#0f172a' : '#f1f5f9', color: currentStatus === s ? 'white' : '#64748b', outline: currentStatus === s ? '2px solid #10b981' : 'none' }}>
+                          {cfg.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Timeline */}
+                  {(job.timeline?.length > 0 || jobNotes.length > 0) && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 10 }}>Activity</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {jobNotes.map((note, i) => (
+                          <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0, marginTop: 5 }} />
+                            <div>
+                              <p style={{ fontSize: 12.5, color: '#334155' }}>{note.text}</p>
+                              <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{note.author} · {note.date} {note.time}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {job.timeline?.map((entry, i) => (
+                          <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#94a3b8', flexShrink: 0, marginTop: 5 }} />
+                            <div>
+                              <p style={{ fontSize: 12.5, color: '#334155' }}>{entry.text}</p>
+                              <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{entry.date}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add note */}
+                  <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                    <input
+                      value={noteText[job.id] || ''}
+                      onChange={e => setNoteText(t => ({ ...t, [job.id]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && handleAddNote(job.id)}
+                      placeholder="Add a note… (press Enter)"
+                      style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit' }}
+                    />
+                    <button onClick={() => handleAddNote(job.id)} className="btn-secondary" style={{ fontSize: 12, flexShrink: 0 }}>
+                      <Send size={12} /> Add Note
+                    </button>
                   </div>
                 </div>
               )}

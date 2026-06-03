@@ -100,7 +100,7 @@ export default function Compliance() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <PDFButton label="Export Compliance Report" onGenerate={() => generateComplianceReport(filtered)} />
-          <button className="btn-primary"><Zap size={13} /> AI Risk Scan</button>
+          <button className="btn-primary"><Zap size={13} /> Compliance Scan</button>
         </div>
       </div>
 
