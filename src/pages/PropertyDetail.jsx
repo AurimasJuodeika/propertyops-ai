@@ -5,19 +5,24 @@ import {
   ClipboardCheck, FileText, PoundSterling, AlertTriangle, CheckCircle,
   Clock, Zap, Edit2, Phone, Mail, ChevronRight, Flame, Leaf, Wind,
   Shield, CreditCard, Calendar, Camera, Upload, Download, X, Save,
-  RefreshCw, Plus, ExternalLink
+  RefreshCw, Plus, ExternalLink, MessageSquare, RotateCcw
 } from 'lucide-react'
 import {
-  PROPERTIES, getLandlordById, getTenantById, getTenancyByPropertyId,
+  PROPERTIES, TENANCIES, getLandlordById, getTenantById, getTenancyByPropertyId,
   MAINTENANCE_JOBS, INSPECTIONS, getContractorById, getComplianceStatus
 } from '../data/mockData'
 import PDFButton from '../components/PDFButton'
 import { generatePropertyReport } from '../lib/pdfExport'
 import RentEditModal from '../components/RentEditModal'
 import EditPropertyModal from '../components/EditPropertyModal'
-import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getRentHistory, getJobStatuses, setJobStatus, getEffectiveJobStatus, getInspectionOverrides, setInspectionOverride, getNewProperties, getAssignedTenantId, assignTenantToProperty, getTenantAssignments, getCustomTenants, createCustomTenant } from '../lib/propertyOverrides'
+import NewTenancyModal from '../components/NewTenancyModal'
+import EndTenancyModal from '../components/EndTenancyModal'
+import RenewalModal from '../components/RenewalModal'
+import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getRentHistory, getJobStatuses, setJobStatus, getEffectiveJobStatus, getInspectionOverrides, setInspectionOverride, getNewProperties, getAssignedTenantId, assignTenantToProperty, getTenantAssignments, getCustomTenants, createCustomTenant, setPropertyOverride } from '../lib/propertyOverrides'
 import { getPayments, calculateArrears } from '../lib/payments'
 import { sendEmail } from '../lib/email'
+import { getTenancyForProperty, createTenancy, updateTenancy, endTenancy, getTenancyStatus, getDaysToEnd } from '../lib/tenancyStore'
+import { getActivityLog, addActivityEntry, getSeedEntries, TYPE_ICON } from '../lib/activityLog'
 import { TENANTS } from '../data/mockData'
 
 // ─── Assign / Create Tenant Panel ────────────────────────────────────────────
@@ -194,6 +199,204 @@ const JOB_STATUS_LABELS = { new:'New', triaged:'Triaged', assigned:'Assigned', i
 const JOB_STATUS_BADGE  = { new:'badge-blue', triaged:'badge-purple', assigned:'badge-amber', in_progress:'badge-blue', completed:'badge-green', on_hold:'badge-slate' }
 const PRIORITY_COLOR    = { emergency:'#dc2626', urgent:'#d97706', routine:'#10b981', cosmetic:'#94a3b8' }
 
+// ─── Tenancy Tab component ────────────────────────────────────────────────────
+function TenancyTab({ property, storedTenancy, mockTenancy, tenant, landlord, arrears, payments, activityLog, rentNoteInput, setRentNoteInput, onNewTenancy, onEndTenancy, onRenewal, onEditTenancy, onAssignTenant, onAddRentNote, navigate, setTab }) {
+  // Use stored tenancy first, fall back to mock
+  const activeTenancy = storedTenancy?.status !== 'ended' ? storedTenancy : null
+  const displayTenancy = activeTenancy || mockTenancy
+
+  const tenancyStatus = activeTenancy ? getTenancyStatus(activeTenancy) : (mockTenancy?.status || null)
+  const daysToEnd     = displayTenancy ? getDaysToEnd(displayTenancy) : null
+  const showRenewalAlert = daysToEnd !== null && daysToEnd <= 90 && daysToEnd > 0
+
+  const STATUS_CONFIG = {
+    active:      { label: 'Active',         class: 'badge-green',  color: '#10b981' },
+    ending_soon: { label: 'Ending Soon',    class: 'badge-amber',  color: '#d97706' },
+    expired:     { label: 'Expired',        class: 'badge-red',    color: '#dc2626' },
+    ended:       { label: 'Ended',          class: 'badge-slate',  color: '#64748b' },
+    void:        { label: 'No Tenancy',     class: 'badge-slate',  color: '#64748b' },
+  }
+  const sc = STATUS_CONFIG[tenancyStatus] || STATUS_CONFIG.void
+
+  // No tenancy empty state
+  if (!displayTenancy) {
+    return (
+      <div>
+        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#f8fafc', borderRadius: 12, border: '2px dashed #e2e8f0', marginBottom: 16 }}>
+          <FileText size={44} color="#cbd5e1" style={{ margin: '0 auto 14px', display: 'block' }} />
+          <p style={{ fontWeight: 800, fontSize: 16, color: '#334155', marginBottom: 8 }}>No active tenancy</p>
+          <p style={{ fontSize: 13.5, color: '#94a3b8', maxWidth: 360, margin: '0 auto 20px', lineHeight: 1.6 }}>
+            Create a tenancy to link a tenant, set the rent and deposit, generate documentation, and track payments.
+          </p>
+          <button className="btn-primary" onClick={onNewTenancy}><Plus size={14} /> New Tenancy</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Renewal alert */}
+      {showRenewalAlert && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <Clock size={16} color="#d97706" />
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>
+              Tenancy ending in {daysToEnd} days — {new Date(displayTenancy.endDate).toLocaleDateString('en-GB')}
+            </p>
+            <p style={{ fontSize: 12, color: '#b45309', marginTop: 1 }}>Consider sending a renewal offer to the tenant.</p>
+          </div>
+          <button className="btn-primary" style={{ fontSize: 12, background: '#d97706', boxShadow: 'none', flexShrink: 0 }} onClick={onRenewal}>
+            <RefreshCw size={12} /> Send Renewal
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {/* Left: Tenancy details */}
+        <div>
+          {/* Status banner */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, padding: '12px 14px', background: `${sc.color}10`, borderRadius: 10, border: `1px solid ${sc.color}25` }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: sc.color, letterSpacing: '0.05em' }}>Tenancy Status</p>
+              <span className={`badge ${sc.class}`} style={{ marginTop: 4, display: 'inline-block' }}>{sc.label}</span>
+            </div>
+            {displayTenancy.tenancyType && (
+              <span className="badge badge-slate">{displayTenancy.tenancyType || 'AST'}</span>
+            )}
+          </div>
+
+          {/* Details grid */}
+          {[
+            ['Tenant',          displayTenancy.tenantName || tenant?.name || '—'],
+            ['Start Date',      displayTenancy.startDate ? new Date(displayTenancy.startDate).toLocaleDateString('en-GB') : '—'],
+            ['End Date',        displayTenancy.endDate ? new Date(displayTenancy.endDate).toLocaleDateString('en-GB') : 'Periodic'],
+            ['Monthly Rent',    `£${(displayTenancy.monthlyRent || 0).toLocaleString()}`],
+            ['Rent Due',        displayTenancy.rentDueDay ? `${displayTenancy.rentDueDay}${[,'st','nd','rd'][displayTenancy.rentDueDay] || 'th'} of the month` : '1st of the month'],
+            ['Deposit',         displayTenancy.depositAmount ? `£${Number(displayTenancy.depositAmount).toLocaleString()}` : '—'],
+            ['Deposit Scheme',  displayTenancy.depositScheme || '—'],
+            ['Deposit Status',  displayTenancy.depositProtected === 'yes' ? '✓ Protected' : displayTenancy.depositProtected === 'pending' ? '⏳ Pending' : '—'],
+            ['Arrears',         arrears > 0 ? `£${arrears.toLocaleString()} outstanding` : 'Up to date'],
+          ].map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid #f8fafc' }}>
+              <span style={{ flex: 1, fontSize: 13, color: '#94a3b8' }}>{label}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: label === 'Arrears' && arrears > 0 ? '#dc2626' : label === 'Arrears' ? '#10b981' : '#0f172a' }}>{value}</span>
+            </div>
+          ))}
+
+          {displayTenancy.notes && (
+            <div style={{ marginTop: 12, padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+              <p style={{ fontSize: 11.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Notes</p>
+              <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.5 }}>{displayTenancy.notes}</p>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button className="btn-secondary" style={{ justifyContent: 'center', fontSize: 13 }} onClick={onEditTenancy}>
+                <Edit2 size={12} /> Edit Tenancy
+              </button>
+              <button className="btn-secondary" style={{ justifyContent: 'center', fontSize: 13 }} onClick={onRenewal}>
+                <RefreshCw size={12} /> Send Renewal
+              </button>
+              <button className="btn-secondary" style={{ justifyContent: 'center', fontSize: 13 }} onClick={() => setTab('documents')}>
+                <Download size={12} /> View Agreement
+              </button>
+              <button className="btn-secondary" style={{ justifyContent: 'center', fontSize: 13 }} onClick={onAssignTenant}>
+                <Users size={12} /> Change Tenant
+              </button>
+            </div>
+            {arrears > 0 && (
+              <button className="btn-primary" style={{ justifyContent: 'center', background: '#dc2626', boxShadow: 'none', fontSize: 13 }} onClick={() => navigate('/rent-arrears')}>
+                <AlertTriangle size={12} /> View Arrears — £{arrears.toLocaleString()}
+              </button>
+            )}
+            <button className="btn-secondary" style={{ justifyContent: 'center', fontSize: 13, color: '#dc2626', borderColor: '#fecaca' }} onClick={onEndTenancy}>
+              <X size={12} /> End Tenancy
+            </button>
+            <button className="btn-primary" style={{ justifyContent: 'center', fontSize: 13 }} onClick={onNewTenancy}>
+              <Plus size={12} /> New Tenancy
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Payments + rent note */}
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em', marginBottom: 12 }}>Payment History</p>
+
+          {payments.length === 0 ? (
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '20px', textAlign: 'center', marginBottom: 14 }}>
+              <PoundSterling size={28} color="#cbd5e1" style={{ margin: '0 auto 8px', display: 'block' }} />
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>No payments recorded</p>
+              <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Go to Tenancies to record monthly payments.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+              {payments.slice(0, 6).map(p => {
+                const ps = {
+                  received: { bg: '#f0fdf4', color: '#16a34a', label: '✓ Received' },
+                  missed:   { bg: '#fef2f2', color: '#dc2626', label: '✗ Missed' },
+                  partial:  { bg: '#fffbeb', color: '#d97706', label: '~ Partial' },
+                  pending:  { bg: '#f8fafc', color: '#64748b', label: '? Pending' },
+                }[p.status] || { bg: '#f8fafc', color: '#64748b', label: p.status }
+                return (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, background: ps.bg }}>
+                    <p style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: '#334155' }}>{new Date(p.due_date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>£{p.amount_due.toLocaleString()}</p>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: `${ps.color}20`, color: ps.color }}>{ps.label}</span>
+                  </div>
+                )
+              })}
+              {payments.length > 6 && <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>+{payments.length - 6} more on Tenancies page</p>}
+            </div>
+          )}
+
+          {/* Demo note */}
+          <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12, padding: '6px 10px', background: '#f8fafc', borderRadius: 6, border: '1px solid #f1f5f9' }}>
+            💡 Payment history saved for this demo session only
+          </p>
+
+          {/* Add rent note */}
+          <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em', marginBottom: 8 }}>Add Rent Note</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={rentNoteInput} onChange={e => setRentNoteInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && rentNoteInput.trim() && onAddRentNote(rentNoteInput.trim())}
+              placeholder="e.g. Tenant called re: payment plan"
+              style={{ flex: 1, border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#0f172a' }} />
+            <button className="btn-secondary" style={{ fontSize: 12, flexShrink: 0 }} onClick={() => rentNoteInput.trim() && onAddRentNote(rentNoteInput.trim())}>
+              <MessageSquare size={12} /> Add
+            </button>
+          </div>
+
+          {/* Tenancy agreement doc */}
+          <div style={{ marginTop: 16, padding: '12px 14px', background: 'white', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 24 }}>📋</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 600, fontSize: 13.5, color: '#0f172a' }}>Tenancy Agreement</p>
+                <p style={{ fontSize: 11.5, color: '#94a3b8' }}>Preview only in demo · real file needs Supabase Storage</p>
+              </div>
+              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setTab('documents')}>
+                <Eye size={12} /> View
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Eye({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  )
+}
+
 function TabBtn({ label, active, onClick, badge }) {
   return (
     <button onClick={onClick} style={{ padding:'10px 18px', border:'none', background:'none', cursor:'pointer', fontSize:13.5, fontWeight:600, fontFamily:'inherit', color: active ? '#10b981' : '#64748b', borderBottom: active ? '2px solid #10b981' : '2px solid transparent', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
@@ -207,8 +410,20 @@ export default function PropertyDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [tab, setTab]                   = useState('overview')
-  const [editingRent, setEditingRent]     = useState(null)
+  const [editingRent, setEditingRent]         = useState(null)
   const [editingProperty, setEditingProperty] = useState(null)
+  const [showNewTenancy, setShowNewTenancy]   = useState(false)
+  const [showEndTenancy, setShowEndTenancy]   = useState(false)
+  const [showRenewal, setShowRenewal]         = useState(false)
+  const [showEditTenancy, setShowEditTenancy] = useState(false)
+  const [tenancyToast, setTenancyToast]       = useState('')
+  const [noteInput, setNoteInput]             = useState('')
+  const [rentNoteInput, setRentNoteInput]     = useState('')
+  const [activityLog, setActivityLog]         = useState([])
+  const [storedTenancy, setStoredTenancy]     = useState(() => getTenancyForProperty(id))
+
+  const showToast = (msg) => { setTenancyToast(msg); setTimeout(() => setTenancyToast(''), 3500) }
+
   const [propertyData, setPropertyData] = useState(() => getEffectiveProperty(
     PROPERTIES.find(p => p.id === id) || getNewProperties().find(p => p.id === id) || {}
   ))
@@ -260,6 +475,17 @@ export default function PropertyDetail() {
   useEffect(() => {
     if (tenancy) getPayments(tenancy.id).then(setPayments)
   }, [tenancy?.id])
+
+  // Load activity log — merge seeded + user entries
+  useEffect(() => {
+    const stored  = getActivityLog(id)
+    const seeded  = getSeedEntries(property, storedTenancy || tenancy)
+    const merged  = [...stored]
+    // Only add seeded entries that don't already exist
+    seeded.forEach(e => { if (!stored.find(s => s.text === e.text)) merged.push(e) })
+    merged.sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0))
+    setActivityLog(merged)
+  }, [id, storedTenancy])
 
   const arrears = calculateArrears(payments)
   const openJobs = jobs.filter(j => getEffectiveJobStatus(j) !== 'completed')
@@ -384,14 +610,16 @@ export default function PropertyDetail() {
       {/* Tabs */}
       <div className="card">
         <div style={{ display:'flex', borderBottom:'1px solid #f1f5f9', paddingLeft:4, overflowX:'auto' }}>
-          <TabBtn label="Overview"    active={tab==='overview'}    onClick={() => setTab('overview')} />
-          <TabBtn label="Compliance"  active={tab==='compliance'}  onClick={() => setTab('compliance')}
+          <TabBtn label="Overview"     active={tab==='overview'}    onClick={() => setTab('overview')} />
+          <TabBtn label="Tenancy"      active={tab==='tenancy'}     onClick={() => setTab('tenancy')} />
+          <TabBtn label="Compliance"   active={tab==='compliance'}  onClick={() => setTab('compliance')}
             badge={Object.values(property.compliance).filter(c => ['expired','not_verified','overdue','expiring_soon'].includes(c.status)).length || null} />
-          <TabBtn label="Tenancy"     active={tab==='tenancy'}     onClick={() => setTab('tenancy')} />
-          <TabBtn label="Maintenance" active={tab==='maintenance'} onClick={() => setTab('maintenance')}
+          <TabBtn label="Maintenance"  active={tab==='maintenance'} onClick={() => setTab('maintenance')}
             badge={openJobs.length || null} />
-          <TabBtn label="Inspections" active={tab==='inspections'} onClick={() => setTab('inspections')} />
-          <TabBtn label="Documents"   active={tab==='documents'}   onClick={() => setTab('documents')} />
+          <TabBtn label="Inspections"  active={tab==='inspections'} onClick={() => setTab('inspections')} />
+          <TabBtn label="Documents"    active={tab==='documents'}   onClick={() => setTab('documents')} />
+          <TabBtn label="Activity"     active={tab==='activity'}    onClick={() => setTab('activity')}
+            badge={activityLog.length || null} />
         </div>
 
         <div style={{ padding:24 }}>
@@ -539,98 +767,30 @@ export default function PropertyDetail() {
 
           {/* ── TENANCY ── */}
           {tab === 'tenancy' && (
-            <div>
-              {tenancy ? (
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
-                  <div>
-                    <p style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', letterSpacing:'0.06em', marginBottom:12 }}>Tenancy Details</p>
-                    {[
-                      ['Status', <span className={`badge ${tenancy.status === 'active' ? 'badge-green' : tenancy.status === 'ending_soon' ? 'badge-amber' : 'badge-red'}`}>{tenancy.status.replace('_',' ')}</span>],
-                      ['Tenant', tenant?.name],
-                      ['Start Date', new Date(tenancy.startDate).toLocaleDateString('en-GB')],
-                      ['End Date', new Date(tenancy.endDate).toLocaleDateString('en-GB')],
-                      ['Monthly Rent', `£${getEffectiveRent(property).toLocaleString()}`],
-                      ['Deposit', `£${tenancy.depositAmount.toLocaleString()} (${tenancy.depositScheme})`],
-                      ['Last Payment', tenancy.lastPaymentDate ? new Date(tenancy.lastPaymentDate).toLocaleDateString('en-GB') : '—'],
-                      ['Arrears', arrears > 0 ? <span style={{ color:'#dc2626', fontWeight:800 }}>£{arrears.toLocaleString()}</span> : <span style={{ color:'#10b981', fontWeight:700 }}>Clear</span>],
-                    ].map(([label, value]) => (
-                      <div key={label} style={{ display:'flex', alignItems:'center', padding:'9px 0', borderBottom:'1px solid #f8fafc' }}>
-                        <span style={{ flex:1, fontSize:13, color:'#94a3b8' }}>{label}</span>
-                        <span style={{ fontSize:13, fontWeight:600, color:'#0f172a' }}>{value}</span>
-                      </div>
-                    ))}
-                    <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:16 }}>
-                      <button className="btn-secondary" style={{ justifyContent:'center' }} onClick={() => setTab('__rent_history')}>
-                        <PoundSterling size={13} /> View Rent History ({payments.length} records)
-                      </button>
-                      <button className="btn-secondary" style={{ justifyContent:'center' }} onClick={async () => {
-                        if (!landlord?.email) { alert('No landlord email.'); return }
-                        await sendEmail({ to: landlord.email, subject: `Tenancy Renewal — ${property.address}`, message: `Dear ${landlord.name},\n\nThe tenancy at ${property.address} is due to end on ${new Date(tenancy.endDate).toLocaleDateString('en-GB')}.\n\nWe recommend offering a renewal to ${tenant?.name}. Please confirm if you would like to proceed.\n\nHarrington & Co · 020 7123 4567` })
-                        setDownloadToast('renewal_sent')
-        setTimeout(() => setDownloadToast(''), 3000)
-                      }}>
-                        <Mail size={13} /> Notify Landlord of Renewal
-                      </button>
-                      <button className="btn-secondary" style={{ justifyContent:'center' }} onClick={() => { setTab('documents') }}>
-                        <Download size={13} /> Download Tenancy Agreement
-                      </button>
-                      {arrears > 0 && (
-                        <button className="btn-primary" style={{ justifyContent:'center', background:'#dc2626', boxShadow:'none' }} onClick={() => navigate('/rent-arrears')}>
-                          <AlertTriangle size={13} /> View Arrears Case
-                        </button>
-                      )}
-                      <button className="btn-secondary" style={{ justifyContent:'center' }} onClick={() => setShowAssignTenant(v => !v)}>
-                        <Users size={13} /> {showAssignTenant ? 'Close' : 'Change Tenant'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Rent history */}
-                  <div>
-                    <p style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', letterSpacing:'0.06em', marginBottom:12 }}>Payment History</p>
-                    {payments.length === 0 ? (
-                      <p style={{ fontSize:13, color:'#94a3b8', fontStyle:'italic' }}>No payments recorded yet. Go to Tenancies to record payments.</p>
-                    ) : (
-                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                        {payments.slice(0,8).map(p => {
-                          const ps = { received:{bg:'#f0fdf4',color:'#16a34a',label:'Received'}, missed:{bg:'#fef2f2',color:'#dc2626',label:'Missed'}, partial:{bg:'#fffbeb',color:'#d97706',label:'Partial'}, pending:{bg:'#f8fafc',color:'#64748b',label:'Pending'} }[p.status] || { bg:'#f8fafc',color:'#64748b',label:p.status }
-                          return (
-                            <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:8, background:ps.bg }}>
-                              <div style={{ flex:1 }}>
-                                <p style={{ fontSize:12.5, fontWeight:600, color:'#334155' }}>{new Date(p.due_date).toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</p>
-                              </div>
-                              <p style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>£{p.amount_due.toLocaleString()}</p>
-                              <span style={{ fontSize:11.5, fontWeight:700, padding:'2px 8px', borderRadius:8, background:`${ps.color}20`, color:ps.color }}>{ps.label}</span>
-                            </div>
-                          )
-                        })}
-                        {payments.length > 8 && <p style={{ fontSize:12, color:'#94a3b8', textAlign:'center' }}>+{payments.length-8} more — see Tenancies page</p>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ textAlign:'center', padding:40 }}>
-                  <FileText size={40} color="#e2e8f0" style={{ margin:'0 auto 12px' }} />
-                  <p style={{ fontWeight:700, color:'#64748b' }}>No tenant assigned</p>
-                  <p style={{ fontSize:13, color:'#94a3b8', marginTop:4 }}>Assign an existing tenant or create a new one.</p>
-                  <button className="btn-primary" style={{ marginTop:14 }} onClick={() => setShowAssignTenant(v => !v)}><Plus size={13} /> Assign Tenant</button>
-                </div>
-              )}
-
-              {/* Assign Tenant inline panel */}
-              {showAssignTenant && (
-                <AssignTenantPanel
-                  property={property}
-                  currentTenant={tenant}
-                  onAssign={(t) => {
-                    setTenant(t)              // update tenant in state immediately
-                    setShowAssignTenant(false)
-                  }}
-                  onClose={() => setShowAssignTenant(false)}
-                />
-              )}
-            </div>
+            <TenancyTab
+              property={property}
+              storedTenancy={storedTenancy}
+              mockTenancy={tenancy}
+              tenant={tenant}
+              landlord={landlord}
+              arrears={arrears}
+              payments={payments}
+              activityLog={activityLog}
+              rentNoteInput={rentNoteInput}
+              setRentNoteInput={setRentNoteInput}
+              onNewTenancy={() => setShowNewTenancy(true)}
+              onEndTenancy={() => setShowEndTenancy(true)}
+              onRenewal={() => setShowRenewal(true)}
+              onEditTenancy={() => setShowEditTenancy(true)}
+              onAssignTenant={() => { setShowAssignTenant(v => !v) }}
+              onAddRentNote={(note) => {
+                const entry = addActivityEntry(id, { type: 'note', text: note })
+                setActivityLog(prev => [entry, ...prev])
+                setRentNoteInput('')
+              }}
+              navigate={navigate}
+              setTab={setTab}
+            />
           )}
 
           {/* ── MAINTENANCE ── */}
@@ -805,8 +965,113 @@ export default function PropertyDetail() {
               </div>
             </div>
           )}
+
+          {/* ── ACTIVITY LOG ── */}
+          {tab === 'activity' && (
+            <div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                <p style={{ fontWeight:700, fontSize:15, color:'#0f172a' }}>Activity Log</p>
+                <span style={{ fontSize:12.5, color:'#94a3b8' }}>{activityLog.length} entries</span>
+              </div>
+
+              {/* Add note */}
+              <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                <input value={noteInput} onChange={e => setNoteInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && noteInput.trim()) {
+                      const entry = addActivityEntry(id, { type:'note', text: noteInput.trim() })
+                      setActivityLog(prev => [entry, ...prev])
+                      setNoteInput('')
+                    }
+                  }}
+                  placeholder="Add a note… (press Enter)"
+                  style={{ flex:1, border:'1.5px solid #e2e8f0', borderRadius:9, padding:'9px 14px', fontSize:13.5, outline:'none', fontFamily:'inherit', color:'#0f172a' }} />
+                <button className="btn-secondary" style={{ fontSize:13, flexShrink:0 }}
+                  onClick={() => {
+                    if (!noteInput.trim()) return
+                    const entry = addActivityEntry(id, { type:'note', text: noteInput.trim() })
+                    setActivityLog(prev => [entry, ...prev])
+                    setNoteInput('')
+                  }}>
+                  <MessageSquare size={13} /> Add Note
+                </button>
+              </div>
+
+              {activityLog.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'32px 0', color:'#94a3b8' }}>
+                  <MessageSquare size={32} style={{ margin:'0 auto 10px', display:'block', opacity:0.3 }} />
+                  <p style={{ fontSize:13, fontWeight:600 }}>No activity recorded yet</p>
+                  <p style={{ fontSize:12, marginTop:4 }}>Activity is logged when tenancies, maintenance jobs, and inspections are created or updated.</p>
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                  {activityLog.map((entry, i) => (
+                    <div key={entry.id || i} style={{ display:'flex', gap:12, padding:'12px 0', borderBottom:`1px solid #f8fafc` }}>
+                      <div style={{ width:32, height:32, borderRadius:8, background:'#f8fafc', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:15 }}>
+                        {TYPE_ICON[entry.type] || '📝'}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontSize:13, color:'#334155', lineHeight:1.5 }}>{entry.text}</p>
+                        <p style={{ fontSize:11.5, color:'#94a3b8', marginTop:3 }}>{entry.author} · {entry.date}{entry.time ? ` at ${entry.time}` : ''}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Success toast ── */}
+      {tenancyToast && (
+        <div style={{ position:'fixed', bottom:90, left:'50%', transform:'translateX(-50%)', background:'#0f172a', color:'white', padding:'12px 22px', borderRadius:10, fontSize:13.5, fontWeight:600, zIndex:80, boxShadow:'0 8px 24px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:8, whiteSpace:'nowrap' }}>
+          <CheckCircle size={16} color="#10b981" /> {tenancyToast}
+        </div>
+      )}
+
+      {/* ── Tenancy modals ── */}
+      {showNewTenancy && (
+        <NewTenancyModal
+          property={property}
+          onSave={(t) => {
+            setStoredTenancy(t)
+            setPropertyOverride(property.id, { status: 'let' })
+            const entry = addActivityEntry(id, { type:'tenancy', text:`New tenancy created for ${t.tenantName}, starting ${new Date(t.startDate).toLocaleDateString('en-GB')}` })
+            setActivityLog(prev => [entry, ...prev])
+            showToast(`Tenancy created for ${property.address}`)
+          }}
+          onClose={() => setShowNewTenancy(false)}
+        />
+      )}
+
+      {showEndTenancy && (storedTenancy || tenancy) && (
+        <EndTenancyModal
+          tenancy={storedTenancy || tenancy}
+          property={property}
+          onEnd={({ endDate, reason }) => {
+            setStoredTenancy(prev => ({ ...prev, status:'ended' }))
+            setPropertyOverride(property.id, { status: 'void' })
+            const entry = addActivityEntry(id, { type:'tenancy', text:`Tenancy ended. Reason: ${reason}. End date: ${new Date(endDate).toLocaleDateString('en-GB')}` })
+            setActivityLog(prev => [entry, ...prev])
+            showToast('Tenancy ended — property set to Void')
+          }}
+          onClose={() => setShowEndTenancy(false)}
+        />
+      )}
+
+      {showRenewal && (storedTenancy || tenancy) && (
+        <RenewalModal
+          tenancy={storedTenancy || tenancy}
+          property={property}
+          onRenew={({ newEndDate, note }) => {
+            const entry = addActivityEntry(id, { type:'renewal', text:`Tenancy renewal offer sent to ${(storedTenancy || tenancy).tenantName}. Proposed end: ${new Date(newEndDate).toLocaleDateString('en-GB')}` })
+            setActivityLog(prev => [entry, ...prev])
+            showToast(`Renewal offer sent to ${(storedTenancy || tenancy).tenantName}`)
+          }}
+          onClose={() => setShowRenewal(false)}
+        />
+      )}
 
       {/* Edit property modal */}
       {editingProperty && (
