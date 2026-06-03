@@ -42,6 +42,32 @@ export function setLandlordOverride(landlordId, data) {
   localStorage.setItem(LANDLORD_KEY, JSON.stringify(all))
 }
 
+// ─── Maintenance job status overrides ────────────────────────────────────────
+const JOB_STATUS_KEY = 'propertyops_job_statuses'
+export function getJobStatuses() {
+  try { return JSON.parse(localStorage.getItem(JOB_STATUS_KEY) || '{}') } catch { return {} }
+}
+export function setJobStatus(jobId, status, notes = '') {
+  const all = getJobStatuses()
+  all[jobId] = { status, notes, updatedAt: new Date().toISOString() }
+  localStorage.setItem(JOB_STATUS_KEY, JSON.stringify(all))
+}
+export function getEffectiveJobStatus(job) {
+  const overrides = getJobStatuses()
+  return overrides[job.id]?.status ?? job.status
+}
+
+// ─── Inspection overrides ─────────────────────────────────────────────────────
+const INSPECTION_KEY = 'propertyops_inspection_overrides'
+export function getInspectionOverrides() {
+  try { return JSON.parse(localStorage.getItem(INSPECTION_KEY) || '{}') } catch { return {} }
+}
+export function setInspectionOverride(id, data) {
+  const all = getInspectionOverrides()
+  all[id] = { ...all[id], ...data, updatedAt: new Date().toISOString() }
+  localStorage.setItem(INSPECTION_KEY, JSON.stringify(all))
+}
+
 // ─── New properties added by users ───────────────────────────────────────────
 const NEW_PROPS_KEY = 'propertyops_new_properties'
 export function getNewProperties() {
