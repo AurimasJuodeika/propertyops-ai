@@ -3,6 +3,7 @@ import { Wrench, AlertTriangle, CheckCircle, Plus, Zap, ChevronRight, User, Cale
 import { MAINTENANCE_JOBS, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sendMaintenanceUpdate, sendContractorAssignment, sendJobCompletionToLandlord } from '../lib/email'
+import { triageMaintenanceJob, isAIConfigured } from '../lib/ai'
 
 const PRIORITY_CONFIG = {
   emergency: { label: 'Emergency', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
@@ -23,6 +24,20 @@ export default function Maintenance() {
   const [priorityFilter, setPriorityFilter] = useState('All')
   const [statusFilter, setStatusFilter]     = useState('All')
   const [expandedJob, setExpandedJob]       = useState(null)
+  const [aiTriageMap, setAiTriageMap]       = useState({})
+  const [triagingId, setTriagingId]         = useState(null)
+
+  const handleAITriage = async (job) => {
+    const property = getPropertyById(job.propertyId)
+    setTriagingId(job.id)
+    try {
+      const result = await triageMaintenanceJob({ job, property })
+      setAiTriageMap(m => ({ ...m, [job.id]: result }))
+    } catch (e) {
+      setAiTriageMap(m => ({ ...m, [job.id]: 'Failed: ' + e.message }))
+    }
+    setTriagingId(null)
+  }
   const [sending, setSending]               = useState(null) // jobId currently sending
   const [sentMap, setSentMap]               = useState({})   // { jobId_action: true }
 
@@ -87,7 +102,9 @@ export default function Maintenance() {
           <p className="page-subtitle">{openJobs.length} open jobs · £{totalEstimated.toLocaleString()} estimated spend</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-secondary"><Zap size={13} /> AI Triage All</button>
+          <button className="btn-secondary" onClick={() => filtered.filter(j => j.status !== 'completed').forEach(j => handleAITriage(j))}>
+            <Zap size={13} /> {isAIConfigured ? 'AI Triage All (Live)' : 'AI Triage All'}
+          </button>
           <button className="btn-primary"><Plus size={13} /> Log Job</button>
         </div>
       </div>
@@ -231,9 +248,26 @@ export default function Maintenance() {
                   <div style={{ background: 'linear-gradient(135deg,#0f172a,#1e293b)', borderRadius: 10, padding: '14px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       <Zap size={13} color="#10b981" />
-                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#10b981' }}>AI Triage Assessment</p>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#10b981' }}>
+                        AI Triage Assessment {isAIConfigured && <span style={{ color: '#059669' }}>· Live</span>}
+                      </p>
                     </div>
-                    <p style={{ fontSize: 12.5, color: '#e2e8f0', lineHeight: 1.6 }}>{job.aiTriage}</p>
+                    {triagingId === job.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 14, height: 14, border: '2px solid rgba(16,185,129,0.3)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                        <p style={{ fontSize: 12, color: '#64748b' }}>Claude is triaging this job…</p>
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: 12.5, color: '#e2e8f0', lineHeight: 1.6 }}>
+                        {aiTriageMap[job.id] || job.aiTriage}
+                      </p>
+                    )}
+                    {isAIConfigured && !aiTriageMap[job.id] && triagingId !== job.id && (
+                      <button onClick={() => handleAITriage(job)}
+                        style={{ marginTop: 8, background: 'none', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6, padding: '4px 10px', color: '#10b981', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        <Zap size={11} style={{ display: 'inline', marginRight: 4 }} /> Regenerate Live Triage
+                      </button>
+                    )}
                   </div>
                   <div style={{ gridColumn: 'span 2', display: 'flex', gap: 8 }}>
                     {/* Notify tenant */}

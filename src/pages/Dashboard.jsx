@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import AnimatedCounter from '../components/AnimatedCounter'
 import { useThemeColors } from '../context/ThemeContext'
+import { generateWeeklySummary, isAIConfigured } from '../lib/ai'
 import {
   AlertTriangle, TrendingUp, Building2, ClipboardCheck, Wrench,
   PoundSterling, ShieldCheck, Users, Zap, ArrowUp, ArrowDown,
@@ -172,7 +173,30 @@ function ActivityItem({ item }) {
 // ─── Role-specific dashboards ────────────────────────────────────────────────
 
 function OwnerDashboard({ data }) {
-  const [aiOpen, setAiOpen] = useState(false)
+  const [aiOpen, setAiOpen]       = useState(false)
+  const [aiText, setAiText]       = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+
+  const handleAISummary = async () => {
+    if (aiText) { setAiOpen(true); return }
+    setAiLoading(true)
+    setAiOpen(true)
+    try {
+      const text = await generateWeeklySummary({
+        agencyName: 'Harrington & Co',
+        properties: PROPERTIES,
+        tenancies:  TENANCIES,
+        jobs:       MAINTENANCE_JOBS,
+        inspections: INSPECTIONS,
+        tasks:      TASKS,
+        branchPerformance: BRANCH_PERFORMANCE,
+      })
+      setAiText(text)
+    } catch (e) {
+      setAiText('Failed to generate summary: ' + e.message)
+    }
+    setAiLoading(false)
+  }
   const t = useThemeColors()
   const { props, jobs, inspections, tenancies } = data
   const compliance = getComplianceSummary()
@@ -294,20 +318,27 @@ function OwnerDashboard({ data }) {
             <Zap size={17} color="white" />
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ color: '#10b981', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>AI Weekly Management Summary</p>
+            <p style={{ color: '#10b981', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+              AI Weekly Management Summary {isAIConfigured && <span style={{ color: '#059669' }}>· Live</span>}
+            </p>
             {aiOpen ? (
               <div>
-                <p style={{ color: '#e2e8f0', fontSize: 13.5, lineHeight: 1.7, marginBottom: 10 }}>
-                  <strong style={{ color: 'white' }}>This week's critical actions:</strong> 4 compliance failures require resolution — the expired Gas Safety Certificate at 22A Upper Street represents both a legal obligation and potential £6,000 fine.
-                  Rent arrears have increased 23% to £21,250 across 4 tenancies — the Helen Morris case should be escalated to Section 8 proceedings.
-                  3 inspections overdue by 60+ days. London North branch compliance score dropped to 78%. <strong style={{ color: '#10b981' }}>12 tasks require your action today.</strong>
-                </p>
-                <button onClick={() => setAiOpen(false)} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 12, cursor: 'pointer' }}>Collapse ↑</button>
+                {aiLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0' }}>
+                    <div style={{ width: 16, height: 16, border: '2px solid rgba(16,185,129,0.3)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <p style={{ color: '#64748b', fontSize: 13 }}>Claude is analysing your portfolio…</p>
+                  </div>
+                ) : (
+                  <p style={{ color: '#e2e8f0', fontSize: 13.5, lineHeight: 1.7, marginBottom: 10, whiteSpace: 'pre-wrap' }}>{aiText}</p>
+                )}
+                <button onClick={() => { setAiOpen(false) }} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 12, cursor: 'pointer' }}>Collapse ↑</button>
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <p style={{ color: '#64748b', fontSize: 13 }}>Harrington & Co · 4 critical issues · £21,250 arrears · 3 overdue inspections</p>
-                <button onClick={() => setAiOpen(true)} className="btn-primary" style={{ flexShrink: 0, fontSize: 12 }}><Zap size={12} /> Read Full Summary</button>
+                <button onClick={handleAISummary} className="btn-primary" style={{ flexShrink: 0, fontSize: 12 }}>
+                  <Zap size={12} /> {isAIConfigured ? 'Generate Live Summary' : 'Read Summary'}
+                </button>
               </div>
             )}
           </div>

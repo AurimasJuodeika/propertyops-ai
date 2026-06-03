@@ -3,6 +3,7 @@ import { PoundSterling, AlertTriangle, TrendingDown, Clock, Zap, Mail, Phone, Fi
 import { TENANCIES, getPropertyById, getTenantById, RENT_COLLECTION_CHART } from '../data/mockData'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { sendArrearsLetter } from '../lib/email'
+import { generateArrearsLetter, isAIConfigured } from '../lib/ai'
 
 const ARREARS_STAGES = {
   stage1: { label: 'Stage 1 — Reminder', days: '7-14', color: '#f59e0b', bg: '#fffbeb' },
@@ -19,8 +20,29 @@ function getArrearStage(months) {
 export default function RentArrears() {
   const [selectedTenancy, setSelectedTenancy] = useState(null)
   const [showAILetter, setShowAILetter]         = useState(false)
-  const [sending, setSending]                   = useState(false)
-  const [sentId, setSentId]                     = useState(null)
+  const [sending, setSending]   = useState(false)
+  const [sentId, setSentId]     = useState(null)
+  const [aiLetter, setAiLetter] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+
+  const handleGenerateLetter = async (tenancy) => {
+    if (!isAIConfigured) return
+    setAiLoading(true)
+    setAiLetter('')
+    try {
+      const stage = tenancy.monthsOverdue >= 3 ? 'stage3' : tenancy.monthsOverdue >= 2 ? 'stage2' : 'stage1'
+      const text = await generateArrearsLetter({
+        tenant:  tenancy.tenant,
+        property: tenancy.property,
+        tenancy,
+        stage,
+      })
+      setAiLetter(text)
+    } catch (e) {
+      setAiLetter('Failed to generate: ' + e.message)
+    }
+    setAiLoading(false)
+  }
 
   const handleSendLetter = async (tenancy) => {
     if (!tenancy?.tenant?.email) { alert('No email address for this tenant.'); return }
@@ -196,7 +218,7 @@ Harrington & Co Property Management`
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 5 }}>
-                        <button className="btn-secondary" style={{ fontSize: 11, padding: '4px 8px' }} onClick={e => { e.stopPropagation(); setSelectedTenancy(t); setShowAILetter(true) }}>
+                        <button className="btn-secondary" style={{ fontSize: 11, padding: '4px 8px' }} onClick={e => { e.stopPropagation(); setSelectedTenancy(t); setAiLetter(''); setShowAILetter(true); if (isAIConfigured) handleGenerateLetter({ ...t, tenant: getTenantById(t.tenantId), property: getPropertyById(t.propertyId), monthsOverdue: Math.round(t.arrears / t.monthlyRent) }) }}>
                           <Zap size={10} /> Letter
                         </button>
                         <button className="btn-secondary" style={{ fontSize: 11, padding: '4px 8px' }} onClick={e => e.stopPropagation()}>
@@ -228,7 +250,12 @@ Harrington & Co Property Management`
               </div>
             </div>
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '16px', fontFamily: 'monospace', fontSize: 13, lineHeight: 1.8, color: '#334155', whiteSpace: 'pre-line', marginBottom: 16 }}>
-              {selectedTenancy ? AI_LETTER : `AI will generate personalised letters for all ${arrearsTenancies.length} arrears cases.\n\nEach letter will be tailored to:\n• The specific arrears amount and duration\n• Previous communication history\n• The appropriate legal stage\n• Landlord preferences for tone`}
+              {aiLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 0' }}>
+                  <div style={{ width: 16, height: 16, border: '2px solid #e2e8f0', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  <span style={{ color: '#64748b', fontSize: 13 }}>Claude is writing the letter…</span>
+                </div>
+              ) : (aiLetter || (selectedTenancy ? AI_LETTER : `AI will generate personalised letters for all ${arrearsTenancies.length} arrears cases.\n\nEach letter will be tailored to:\n• The specific arrears amount and duration\n• Previous communication history\n• The appropriate legal stage\n• Landlord preferences for tone`))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-secondary" onClick={() => setShowAILetter(false)} style={{ flex: 1, justifyContent: 'center' }}>Close</button>
