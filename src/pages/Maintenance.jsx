@@ -28,7 +28,14 @@ export default function Maintenance() {
   const [jobStatuses, setJobStatuses]       = useState(getJobStatuses())
   const [noteText, setNoteText]             = useState({})
   const [notesMap, setNotesMap]             = useState({})
+  const [aiTriageMap, setAiTriageMap]       = useState({})
+  const [triagingId, setTriagingId]         = useState(null)
+  const [showLogJob, setShowLogJob]         = useState(false)
+  const [logJobForm, setLogJobForm]         = useState({ title:'', priority:'routine', description:'' })
+  const [customJobs, setCustomJobs]         = useState(() => { try { return JSON.parse(localStorage.getItem('propertyops_custom_jobs')||'[]') } catch { return [] } })
+  const [toast, setToast]                   = useState('')
 
+  // ALL_JOBS must come after customJobs is declared
   const ALL_JOBS = [...MAINTENANCE_JOBS, ...customJobs]
 
   const handleStatusChange = (jobId, status) => {
@@ -46,12 +53,6 @@ export default function Maintenance() {
 
   const getStatus = (job) => jobStatuses[job.id]?.status ?? job.status
   const getNotes  = (job) => notesMap[job.id] ?? getJobNotes(job.id)
-  const [aiTriageMap, setAiTriageMap]       = useState({})
-  const [triagingId, setTriagingId]         = useState(null)
-  const [showLogJob, setShowLogJob]         = useState(false)
-  const [logJobForm, setLogJobForm]         = useState({ title:'', priority:'routine', description:'' })
-  const [customJobs, setCustomJobs]         = useState(() => { try { return JSON.parse(localStorage.getItem('propertyops_custom_jobs')||'[]') } catch { return [] } })
-  const [toast, setToast]                   = useState('')
   const showJobToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
   const saveJob = () => {
     if (!logJobForm.title.trim()) return
