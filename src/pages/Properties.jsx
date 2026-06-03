@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Search, ChevronRight, Users, ShieldCheck, AlertTriangle, Home, Plus, MapPin, BedDouble, Edit2, X, Save } from 'lucide-react'
 import { PROPERTIES, getLandlordById, getTenantById, getComplianceStatus, LANDLORDS } from '../data/mockData'
@@ -14,7 +15,7 @@ const COMPLIANCE_LABEL  = { critical: '⚠ Critical', warning: '⚠ Warning', co
 const EMPTY_FORM = { address:'', city:'London', postcode:'', type:'Flat', bedrooms:2, bathrooms:1, rent:'', status:'void', managementType:'full', branch:'London Central', landlordId:'', inspectorId:'s10', managerId:'s5' }
 const DEFAULT_COMPLIANCE = { epc:{grade:'D',expiry:'',status:'valid'}, gasSafety:{expiry:'',engineer:'',status:'valid'}, eicr:{expiry:'',engineer:'',status:'valid'}, smokeAlarm:{lastCheck:'',status:'valid'}, depositProtection:{scheme:null,reference:null,amount:0,status:'n/a'}, rightToRent:{tenantId:null,status:'n/a',expiry:null} }
 
-function AddPropertyModal({ onSave, onClose }) {
+function AddPropertyModal({ onSave, onClose, anchorRect }) {
   const [form, setForm]   = useState(EMPTY_FORM)
   const [step, setStep]   = useState(1) // 1=details, 2=landlord+mgmt
   const [errors, setErrors] = useState({})
@@ -51,11 +52,11 @@ function AddPropertyModal({ onSave, onClose }) {
   const focus = e => e.target.style.borderColor = '#10b981'
   const blur  = e => e.target.style.borderColor = errors[e.target.name] ? '#dc2626' : '#e2e8f0'
 
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.7)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
-      onClick={onClose}>
-      <div style={{ background:'white', borderRadius:16, width:'100%', maxWidth:520, padding:24, boxShadow:'0 24px 60px rgba(0,0,0,0.3)', maxHeight:'90vh', overflowY:'auto' }}
-        onClick={e => e.stopPropagation()}>
+  const popoverPos = anchorRect ? getAddPropertyPosition(anchorRect) : null
+
+  const inner = (
+    <div style={{ background:'white', borderRadius:16, width:520, padding:24, boxShadow:'0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)', maxHeight:'88vh', overflowY:'auto' }}
+      onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
@@ -199,9 +200,34 @@ function AddPropertyModal({ onSave, onClose }) {
             </div>
           </div>
         )}
-      </div>
     </div>
   )
+
+  return createPortal(
+    <>
+      <div style={{ position:'fixed', inset:0, zIndex:59 }} onClick={onClose} />
+      <div style={{ position:'fixed', zIndex:60, ...popoverPos }}>
+        {inner}
+      </div>
+    </>,
+    document.body
+  )
+}
+
+function getAddPropertyPosition(rect) {
+  const w = 520, h = 600, gap = 8
+  const vw = window.innerWidth, vh = window.innerHeight
+
+  // Align right edge of popover with right edge of button
+  let left = rect.right - w
+  left = Math.max(8, Math.min(left, vw - w - 8))
+
+  // Appear below button; if not enough room, above
+  let top = rect.bottom + gap
+  if (top + h > vh - 8) top = rect.top - h - gap
+  top = Math.max(8, top)
+
+  return { top, left }
 }
 
 export default function Properties() {
@@ -211,7 +237,7 @@ export default function Properties() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [editingRent, setEditingRent]   = useState(null)
   const [rentOverrides, setRentOverrides] = useState(getPropertyOverrides())
-  const [showAdd, setShowAdd]           = useState(false)
+  const [showAdd, setShowAdd]           = useState(null) // anchorRect | null
   const [newProperties, setNewProperties] = useState(getNewProperties())
 
   const allProperties = [...PROPERTIES, ...newProperties]
@@ -235,7 +261,7 @@ export default function Properties() {
           <h1 className="page-title">Properties</h1>
           <p className="page-subtitle">{PROPERTIES.length} managed · {PROPERTIES.filter(p => p.status === 'let').length} let · {PROPERTIES.filter(p => p.status === 'void').length} void</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add Property</button>
+        <button className="btn-primary" onClick={e => setShowAdd(e.currentTarget.getBoundingClientRect())}><Plus size={14} /> Add Property</button>
       </div>
 
       {/* Filters */}
@@ -407,11 +433,12 @@ export default function Properties() {
         })}
       </div>
 
-      {/* Add property modal */}
+      {/* Add property — anchored popover */}
       {showAdd && (
         <AddPropertyModal
-          onSave={() => { setNewProperties(getNewProperties()); setShowAdd(false) }}
-          onClose={() => setShowAdd(false)}
+          anchorRect={showAdd}
+          onSave={() => { setNewProperties(getNewProperties()); setShowAdd(null) }}
+          onClose={() => setShowAdd(null)}
         />
       )}
 
