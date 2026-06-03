@@ -661,8 +661,8 @@ export default function PropertyDetail() {
                   <a href={`mailto:${landlord?.email}`} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12.5, color:'#334155', textDecoration:'none', marginBottom:5 }}><Mail size={12} color="#94a3b8" />{landlord?.email}</a>
                   <a href={`tel:${landlord?.phone}`} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12.5, color:'#334155', textDecoration:'none' }}><Phone size={12} color="#94a3b8" />{landlord?.phone}</a>
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                    <button className="btn-secondary" style={{ flex:1, justifyContent:'center', fontSize:12 }}><Mail size={12} /> Email</button>
-                    <button className="btn-primary" style={{ flex:1, justifyContent:'center', fontSize:12 }} onClick={handleAISummary}><Zap size={12} /> AI Update</button>
+                    <a href={`mailto:${landlord?.email}`} className="btn-secondary" style={{ flex:1, justifyContent:'center', fontSize:12, textDecoration:'none' }}><Mail size={12} /> Email</a>
+                    <button className="btn-primary" style={{ flex:1, justifyContent:'center', fontSize:12 }} onClick={handleAISummary}><Zap size={12} /> Summary</button>
                   </div>
                 </div>
 

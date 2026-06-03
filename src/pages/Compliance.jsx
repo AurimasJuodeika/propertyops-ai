@@ -119,7 +119,7 @@ export default function Compliance() {
               Expired certificates expose the agency to financial penalties and invalidate insurance. Immediate action required.
             </p>
           </div>
-          <button className="btn-primary" style={{ background: '#dc2626' }}>View Critical Issues →</button>
+          <button className="btn-primary" style={{ background: '#dc2626' }} onClick={() => setFilter('Critical')}>View Critical Issues →</button>
         </div>
       )}
 

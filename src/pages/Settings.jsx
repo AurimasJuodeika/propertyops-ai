@@ -8,9 +8,16 @@ import { updateProfile } from '../lib/auth'
 import SupabaseSetup from '../components/SupabaseSetup'
 
 export default function SettingsPage() {
-  const [apiKey, setApiKey] = useState(localStorage.getItem('anthropic_api_key') || '')
-  const [saved, setSaved]   = useState(false)
+  const [apiKey, setApiKey]       = useState(localStorage.getItem('anthropic_api_key') || '')
+  const [saved, setSaved]         = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
+  const [settingsSaved, setSettingsSaved] = useState('')  // which section just saved
+
+  const saveSection = (key) => {
+    localStorage.setItem(`propertyops_settings_${key}`, Date.now().toString())
+    setSettingsSaved(key)
+    setTimeout(() => setSettingsSaved(''), 2000)
+  }
   const [activeSection, setActiveSection] = useState('appearance')
   const { isDark, toggle } = useTheme()
   const t = useThemeColors()
@@ -268,7 +275,7 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-              <button className="btn-primary" style={{ marginTop: 20 }}><Save size={13} /> Save Changes</button>
+              <button className="btn-primary" style={{ marginTop: 20 }} onClick={() => saveSection('agency')}><Save size={13} /> {settingsSaved === 'agency' ? '✓ Saved!' : 'Save Changes'}</button>
             </div>
           )}
 
@@ -334,7 +341,7 @@ export default function SettingsPage() {
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <p style={{ fontSize: 15, fontWeight: 700 }}>Team Members</p>
-                <button className="btn-primary" style={{ fontSize: 12 }}><Users size={12} /> Invite User</button>
+                <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => alert('Invite User: enter email and role. Coming in next sprint — requires backend email delivery.')}><Users size={12} /> Invite User</button>
               </div>
               <table className="data-table">
                 <thead>
@@ -393,7 +400,7 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-              <button className="btn-primary" style={{ marginTop: 16 }}><Save size={13} /> Save Preferences</button>
+              <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => saveSection('notifications')}><Save size={13} /> {settingsSaved === 'notifications' ? '✓ Saved!' : 'Save Preferences'}</button>
             </div>
           )}
 
@@ -418,7 +425,7 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-              <button className="btn-primary" style={{ marginTop: 20 }}><Save size={13} /> Save Thresholds</button>
+              <button className="btn-primary" style={{ marginTop: 20 }} onClick={() => saveSection('compliance')}><Save size={13} /> {settingsSaved === 'compliance' ? '✓ Saved!' : 'Save Thresholds'}</button>
             </div>
           )}
         </div>

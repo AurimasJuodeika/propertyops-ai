@@ -699,7 +699,7 @@ function MaintenanceDashboard({ data }) {
                 </div>
                 <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 8, background: `${pc[job.priority]}15`, color: pc[job.priority], textTransform: 'capitalize' }}>{job.priority}</span>
                 <span className={`badge ${job.assignedTo ? 'badge-blue' : 'badge-amber'}`}>{job.assignedTo ? 'Assigned' : 'Unassigned'}</span>
-                {!job.assignedTo && <button className="btn-primary" style={{ fontSize: 11, padding: '4px 8px' }}>Assign</button>}
+                {!job.assignedTo && <button className="btn-primary" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => window.location.href='/contractors'}>Assign →</button>}
               </div>
             )
           })}

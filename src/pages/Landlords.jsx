@@ -373,7 +373,7 @@ Harrington & Co Property Management` : ''
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}><Mail size={13} /> Email</button>
+              <a href={`mailto:${selected.email}`} className="btn-secondary" style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}><Mail size={13} /> Email</a>
               <PDFButton label="Statement PDF" className="btn-secondary" style={{ flex: 1 }}
                 onGenerate={() => generateLandlordStatement(selected, selected.propertyList, TENANCIES.filter(t => selected.properties.includes(t.propertyId)), [])} />
               <button className="btn-primary" style={{ flex: 2, justifyContent: 'center' }} onClick={() => setShowAIUpdate(true)}>

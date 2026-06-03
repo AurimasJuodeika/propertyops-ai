@@ -191,7 +191,7 @@ export default function Contractors() {
                     <a href={`mailto:${c.email}`} className="btn-secondary" style={{ fontSize: 13, textDecoration: 'none' }}>
                       <Mail size={13} /> Email
                     </a>
-                    <button className="btn-primary" style={{ fontSize: 13 }}>Assign to Job</button>
+                    <button className="btn-primary" style={{ fontSize: 13 }} onClick={() => window.location.href='/maintenance'}>Assign to Job →</button>
                   </div>
                 </div>
               )}
