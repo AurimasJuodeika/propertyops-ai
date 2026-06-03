@@ -1,6 +1,18 @@
 // LocalStorage-backed overrides for properties
 // In production these would be Supabase writes
 
+// ─── Get effective rent (override takes priority over mock data) ──────────────
+export function getEffectiveRent(property) {
+  const overrides = getPropertyOverrides()
+  return overrides[property.id]?.rent ?? property.rent
+}
+
+// ─── Get rent history for a property ─────────────────────────────────────────
+export function getRentHistory(propertyId) {
+  const overrides = getPropertyOverrides()
+  return overrides[propertyId]?.rentHistory || []
+}
+
 const PROPS_KEY    = 'propertyops_property_overrides'
 const LANDLORD_KEY = 'propertyops_landlord_overrides'
 

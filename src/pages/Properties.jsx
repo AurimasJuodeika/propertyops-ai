@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Building2, Search, ChevronRight, Users, PoundSterling, ShieldCheck, AlertTriangle, Home, Plus, MapPin, BedDouble } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Building2, Search, ChevronRight, Users, ShieldCheck, AlertTriangle, Home, Plus, MapPin, BedDouble, Edit2 } from 'lucide-react'
 import { PROPERTIES, getLandlordById, getTenantById, getComplianceStatus } from '../data/mockData'
+import { getEffectiveRent, getPropertyOverrides } from '../lib/propertyOverrides'
+import RentEditModal from '../components/RentEditModal'
 
 const STATUS_LABELS = { let: 'Let', available: 'Available', void: 'Void', under_offer: 'Under Offer' }
 const STATUS_BADGE  = { let: 'badge-green', available: 'badge-blue', void: 'badge-amber', under_offer: 'badge-purple' }
@@ -10,9 +11,11 @@ const COMPLIANCE_BADGE  = { critical: 'badge-red', warning: 'badge-amber', compl
 const COMPLIANCE_LABEL  = { critical: '⚠ Critical', warning: '⚠ Warning', compliant: '✓ OK', info: 'Void' }
 
 export default function Properties() {
-  const [search, setSearch]           = useState('')
+  const [search, setSearch]             = useState('')
   const [branchFilter, setBranchFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [editingRent, setEditingRent]   = useState(null)
+  const [rentOverrides, setRentOverrides] = useState(getPropertyOverrides())
 
   const filtered = PROPERTIES.filter(p => {
     const q = search.toLowerCase()
@@ -112,7 +115,23 @@ export default function Properties() {
                     </td>
                     <td style={{ color: '#64748b', fontSize: 12.5 }}>{p.branch}</td>
                     <td style={{ color: '#64748b', fontSize: 12.5 }}>{p.type}</td>
-                    <td style={{ fontWeight: 700, color: '#0f172a' }}>£{p.rent.toLocaleString()}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div>
+                          <span style={{ fontWeight: 700, color: '#0f172a' }}>£{getEffectiveRent(p).toLocaleString()}</span>
+                          {rentOverrides[p.id]?.rent && rentOverrides[p.id].rent !== p.rent && (
+                            <p style={{ fontSize: 10.5, color: rentOverrides[p.id].rent > p.rent ? '#10b981' : '#dc2626', fontWeight: 600 }}>
+                              was £{p.rent.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        <button onClick={e => { e.stopPropagation(); setEditingRent(p) }}
+                          title="Edit rent"
+                          style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #e2e8f0', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                          <Edit2 size={11} color="#64748b" />
+                        </button>
+                      </div>
+                    </td>
                     <td><span className={`badge ${STATUS_BADGE[p.status]}`}>{STATUS_LABELS[p.status]}</span></td>
                     <td style={{ fontSize: 12.5, color: '#334155' }}>{tenant?.name || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Vacant</span>}</td>
                     <td style={{ fontSize: 12.5, color: '#334155' }}>{landlord?.name}</td>
@@ -162,8 +181,10 @@ export default function Properties() {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <p style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>£{p.rent.toLocaleString()}</p>
-                  <p style={{ fontSize: 11, color: '#94a3b8' }}>/month</p>
+                  <p style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>£{getEffectiveRent(p).toLocaleString()}</p>
+                  {rentOverrides[p.id]?.rent && rentOverrides[p.id].rent !== p.rent && (
+                    <p style={{ fontSize: 10.5, color: rentOverrides[p.id].rent > p.rent ? '#10b981' : '#dc2626', fontWeight: 600 }}>was £{p.rent.toLocaleString()}</p>
+                  )}
                 </div>
               </div>
 
@@ -186,6 +207,15 @@ export default function Properties() {
           )
         })}
       </div>
+
+      {/* Rent edit modal */}
+      {editingRent && (
+        <RentEditModal
+          property={editingRent}
+          onSave={(propertyId) => setRentOverrides(getPropertyOverrides())}
+          onClose={() => setEditingRent(null)}
+        />
+      )}
     </div>
   )
 }

@@ -4,74 +4,10 @@ import { LANDLORDS, PROPERTIES, TENANCIES } from '../data/mockData'
 import PDFButton from '../components/PDFButton'
 import { generateLandlordStatement } from '../lib/pdfExport'
 import { sendLandlordUpdate } from '../lib/email'
-import { getPropertyOverrides, setPropertyOverride, getLandlordOverrides, setLandlordOverride, getNewProperties, addNewProperty, removeNewProperty } from '../lib/propertyOverrides'
+import { getPropertyOverrides, setPropertyOverride, getLandlordOverrides, setLandlordOverride, getNewProperties, addNewProperty, removeNewProperty, getEffectiveRent } from '../lib/propertyOverrides'
+import RentEditModal from '../components/RentEditModal'
 
 // ─── Rent Edit Modal ──────────────────────────────────────────────────────────
-function RentEditModal({ property, currentRent, onSave, onClose }) {
-  const [rent, setRent]     = useState(currentRent)
-  const [reason, setReason] = useState('')
-  const change   = rent - currentRent
-  const changePct= currentRent > 0 ? ((change / currentRent) * 100).toFixed(1) : 0
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 420, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Update Rent</h2>
-            <p style={{ fontSize: 13, color: '#64748b' }}>{property.address}, {property.postcode}</p>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} color="#94a3b8" /></button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, padding: '12px', background: '#f8fafc', borderRadius: 10 }}>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Current Rent</p>
-            <p style={{ fontSize: 22, fontWeight: 800, color: '#0f172a' }}>£{currentRent.toLocaleString()}</p>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>New Rent</p>
-            <p style={{ fontSize: 22, fontWeight: 800, color: change > 0 ? '#10b981' : change < 0 ? '#dc2626' : '#0f172a' }}>£{Number(rent).toLocaleString()}</p>
-          </div>
-        </div>
-
-        {change !== 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16, padding: '8px', borderRadius: 8, background: change > 0 ? '#f0fdf4' : '#fef2f2' }}>
-            {change > 0 ? <TrendingUp size={14} color="#10b981" /> : <TrendingDown size={14} color="#dc2626" />}
-            <span style={{ fontSize: 13, fontWeight: 700, color: change > 0 ? '#10b981' : '#dc2626' }}>
-              {change > 0 ? '+' : ''}£{Math.abs(change).toLocaleString()} ({change > 0 ? '+' : ''}{changePct}%) per month
-            </span>
-          </div>
-        )}
-
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 6 }}>New Monthly Rent (£)</label>
-          <input type="number" value={rent} onChange={e => setRent(Number(e.target.value))}
-            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 9, padding: '11px 14px', fontSize: 20, fontWeight: 800, outline: 'none', fontFamily: 'inherit', color: '#0f172a', boxSizing: 'border-box', textAlign: 'center' }}
-            onFocus={e => e.target.style.borderColor = '#10b981'}
-            onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 6 }}>Reason for change <span style={{ color: '#cbd5e1', fontWeight: 400 }}>(optional)</span></label>
-          <input value={reason} onChange={e => setReason(e.target.value)}
-            placeholder="e.g. Annual rent review, market rate increase, renewal agreement…"
-            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 9, padding: '10px 14px', fontSize: 13.5, outline: 'none', fontFamily: 'inherit', color: '#0f172a', boxSizing: 'border-box' }}
-            onFocus={e => e.target.style.borderColor = '#10b981'}
-            onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
-          <button onClick={() => onSave(rent, reason)} className="btn-primary" style={{ flex: 2, justifyContent: 'center' }} disabled={rent === currentRent}>
-            <Save size={14} /> Save Rent Change
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Add Property Modal ───────────────────────────────────────────────────────
 function AddPropertyModal({ landlordId, existingIds, onSave, onClose }) {
   const [mode, setMode]   = useState('new') // 'new' | 'existing'
@@ -225,11 +161,6 @@ If you have any questions about your portfolio, please contact your dedicated pr
 Kind regards,
 Harrington & Co Property Management` : ''
 
-  function getEffectiveRent(property) {
-    const override = rentOverrides[property.id]
-    return override?.rent ?? property.rent
-  }
-
   function getPropertyList(landlord) {
     const landOverride  = landlordOverrides[landlord.id]
     const baseIds       = [...landlord.properties, ...(landOverride?.addedPropertyIds || [])]
@@ -257,10 +188,8 @@ Harrington & Co Property Management` : ''
     setSending(false)
   }
 
-  const handleRentSave = (property, newRent, reason) => {
-    setPropertyOverride(property.id, { rent: newRent, rentHistory: [{ from: property.rent, to: newRent, reason, date: new Date().toISOString() }, ...(getPropertyOverrides()[property.id]?.rentHistory || [])] })
+  const handleRentSave = (propertyId, newRent) => {
     setRentOverrides(getPropertyOverrides())
-    setEditingRent(null)
   }
 
   const handleRemoveProperty = (landlord, propertyId) => {
@@ -459,8 +388,7 @@ Harrington & Co Property Management` : ''
       {editingRent && (
         <RentEditModal
           property={editingRent}
-          currentRent={getEffectiveRent(editingRent)}
-          onSave={(newRent, reason) => handleRentSave(editingRent, newRent, reason)}
+          onSave={handleRentSave}
           onClose={() => setEditingRent(null)}
         />
       )}

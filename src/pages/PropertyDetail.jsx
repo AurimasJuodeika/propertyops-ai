@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import PDFButton from '../components/PDFButton'
 import { generatePropertyReport } from '../lib/pdfExport'
+import RentEditModal from '../components/RentEditModal'
+import { getEffectiveRent, getPropertyOverrides, getRentHistory } from '../lib/propertyOverrides'
 import {
   PROPERTIES, getLandlordById, getTenantById, getTenancyByPropertyId,
   MAINTENANCE_JOBS, INSPECTIONS, getContractorById, getComplianceStatus
@@ -45,7 +47,9 @@ function TabBtn({ label, active, onClick, badge }) {
 export default function PropertyDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('overview')
+  const [tab, setTab]           = useState('overview')
+  const [editingRent, setEditingRent] = useState(false)
+  const [rentOverride, setRentOverride] = useState(getPropertyOverrides())
 
   const property = PROPERTIES.find(p => p.id === id)
   if (!property) return (
@@ -87,7 +91,7 @@ export default function PropertyDetail() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              <button className="btn-secondary"><Edit size={13} /> Edit</button>
+              <button className="btn-secondary" onClick={() => setEditingRent(true)}><Edit size={13} /> Edit Rent</button>
               <PDFButton
                 label="Property Report"
                 onGenerate={() => generatePropertyReport(property, landlord, tenant, tenancy, maintenanceJobs, inspections)}
@@ -101,7 +105,7 @@ export default function PropertyDetail() {
       {/* Hero cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Monthly Rent', value: `£${property.rent.toLocaleString()}`, icon: PoundSterling, color: '#10b981' },
+          { label: 'Monthly Rent', value: `£${getEffectiveRent(property).toLocaleString()}`, icon: PoundSterling, color: '#10b981' },
           { label: 'Type', value: `${property.bedrooms}bd ${property.type}`, icon: Building2, color: '#6366f1' },
           { label: 'Landlord', value: landlord?.name?.split(' ').slice(0,2).join(' ') || '—', icon: Users, color: '#0284c7' },
           { label: 'Current Tenant', value: tenant?.name?.split(' ')[0] || 'Vacant', icon: User, color: tenant ? '#10b981' : '#94a3b8' },
@@ -145,7 +149,7 @@ export default function PropertyDetail() {
                     { label: 'Bathrooms', value: property.bathrooms },
                     { label: 'Branch', value: property.branch },
                     { label: 'Management Type', value: property.managementType === 'full' ? 'Full Management' : property.managementType === 'rent_collection' ? 'Rent Collection' : 'Let Only' },
-                    { label: 'Monthly Rent', value: `£${property.rent.toLocaleString()}` },
+                    { label: 'Monthly Rent', value: `£${getEffectiveRent(property).toLocaleString()}${rentOverride[property.id]?.rent && rentOverride[property.id].rent !== property.rent ? ` (was £${property.rent.toLocaleString()})` : ''}` },
                     { label: 'Last Inspection', value: property.lastInspection ? new Date(property.lastInspection).toLocaleDateString('en-GB') : 'None recorded' },
                     { label: 'Next Inspection', value: property.nextInspection ? new Date(property.nextInspection).toLocaleDateString('en-GB') : 'Not scheduled' },
                   ].map(row => (
@@ -438,6 +442,15 @@ export default function PropertyDetail() {
           )}
         </div>
       </div>
+
+      {/* Rent edit modal */}
+      {editingRent && (
+        <RentEditModal
+          property={property}
+          onSave={() => setRentOverride(getPropertyOverrides())}
+          onClose={() => setEditingRent(false)}
+        />
+      )}
     </div>
   )
 }
