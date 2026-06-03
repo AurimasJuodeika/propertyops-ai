@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Wrench, AlertTriangle, CheckCircle, Clock, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail, Send } from 'lucide-react'
-import { MAINTENANCE_JOBS, BIRMINGHAM_MAINTENANCE, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH, getJobNotes, addJobNote } from '../data/mockData'
+import { MAINTENANCE_JOBS, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH, getJobNotes, addJobNote } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sendMaintenanceUpdate, sendContractorAssignment, sendJobCompletionToLandlord } from '../lib/email'
 import { getEffectiveJobStatus, setJobStatus, getJobStatuses } from '../lib/propertyOverrides'
@@ -29,8 +29,7 @@ export default function Maintenance() {
   const [noteText, setNoteText]             = useState({})
   const [notesMap, setNotesMap]             = useState({})
 
-  // Merge all maintenance jobs
-  const ALL_JOBS = [...MAINTENANCE_JOBS, ...BIRMINGHAM_MAINTENANCE]
+  const ALL_JOBS = MAINTENANCE_JOBS
 
   const handleStatusChange = (jobId, status) => {
     setJobStatus(jobId, status)

@@ -36,6 +36,10 @@ export const LANDLORDS = [
   { id: 'l8', name: 'Michael & Susan Tanaka', email: 'tanakaprop@gmail.com', phone: '07788 223 445', properties: ['p19','p20'], type: 'Portfolio', managementFee: 10, statementFrequency: 'monthly', preferredContact: 'email', balance: 5600.00, rating: 5 },
   { id: 'l9', name: 'Amara Osei', email: 'a.osei@osei-invest.co.uk', phone: '07934 556 112', properties: ['p21','p22','p23'], type: 'Investor', managementFee: 9, statementFrequency: 'quarterly', preferredContact: 'portal', balance: 9800.00, rating: 5 },
   { id: 'l10', name: 'Trevor Knight', email: 'trevor.k@hotmail.co.uk', phone: '07512 889 334', properties: ['p24'], type: 'Single', managementFee: 12, statementFrequency: 'monthly', preferredContact: 'phone', balance: 780.00, rating: 3 },
+  // Birmingham landlords
+  { id: 'bl1', name: 'Patel Property Group', email: 'accounts@patelproperty.co.uk', phone: '07812 445 221', properties: ['bp1','bp2','bp3'], type: 'Investor', managementFee: 9, statementFrequency: 'monthly', preferredContact: 'email', balance: 14200, rating: 5 },
+  { id: 'bl2', name: 'Derek & Carol Simmons', email: 'd.simmons@gmail.com', phone: '07734 882 113', properties: ['bp4','bp5'], type: 'Portfolio', managementFee: 10, statementFrequency: 'monthly', preferredContact: 'phone', balance: 3800, rating: 4 },
+  { id: 'bl3', name: 'Yusuf Okafor', email: 'y.okafor@outlook.com', phone: '07923 667 445', properties: ['bp6'], type: 'Single', managementFee: 12, statementFrequency: 'monthly', preferredContact: 'email', balance: 1200, rating: 4 },
 ]
 
 export const TENANTS = [
@@ -54,6 +58,13 @@ export const TENANTS = [
   { id: 't13', name: 'Fiona & Craig McLeod', email: 'mcleods@gmail.com', phone: '07845 667 223', propertyId: 'p13', rtRVerified: true, rtRExpiry: '2026-04-22', nationality: 'British' },
   { id: 't14', name: 'Yuki Tanaka', email: 'y.tanaka@gmail.com', phone: '07923 112 445', propertyId: 'p14', rtRVerified: true, rtRExpiry: '2025-12-31', nationality: 'Japanese (Tier 2 Visa)' },
   { id: 't15', name: 'Olga Novak', email: 'o.novak@yahoo.com', phone: '07634 778 112', propertyId: 'p15', rtRVerified: true, rtRExpiry: '2025-11-20', nationality: 'Czech (EU Pre-settled)' },
+  // Birmingham tenants
+  { id: 'bt1', name: 'Callum & Jade Brennan', email: 'callum.brennan@gmail.com', phone: '07812 334 991', propertyId: 'bp1', rtRVerified: true, rtRExpiry: '2026-04-10', nationality: 'British' },
+  { id: 'bt2', name: 'Amara Diallo', email: 'a.diallo@yahoo.co.uk', phone: '07923 445 770', propertyId: 'bp2', rtRVerified: true, rtRExpiry: '2025-08-20', nationality: 'French (EU Pre-settled)' },
+  { id: 'bt3', name: 'Stuart & Fiona MacLeod', email: 'stuartfiona@gmail.com', phone: '07611 224 887', propertyId: 'bp3', rtRVerified: true, rtRExpiry: '2027-01-15', nationality: 'British' },
+  { id: 'bt4', name: 'Precious Adeyemi', email: 'p.adeyemi@gmail.com', phone: '07845 667 334', propertyId: 'bp4', rtRVerified: false, rtRExpiry: null, nationality: 'Nigerian (Visa required)' },
+  { id: 'bt5', name: 'Tom & Sarah Whitfield', email: 'whitfields@gmail.com', phone: '07712 990 445', propertyId: 'bp5', rtRVerified: true, rtRExpiry: '2026-11-30', nationality: 'British' },
+  { id: 'bt6', name: 'Lena Grabowski', email: 'l.grabowski@outlook.com', phone: '07934 112 889', propertyId: 'bp6', rtRVerified: true, rtRExpiry: '2025-09-05', nationality: 'Polish (EU Pre-settled)' },
 ]
 
 export const CONTRACTORS = [
@@ -349,6 +360,13 @@ export const PROPERTIES = [
       rightToRent: { tenantId: 't10', status: 'valid', expiry: '2026-02-28' },
     }
   },
+  // ── Birmingham properties ─────────────────────────────────────────────────
+  { id: 'bp1', address: '42 Moseley Road', city: 'Birmingham', postcode: 'B12 9AA', branch: 'Birmingham', type: 'Terrace', bedrooms: 3, bathrooms: 1, rent: 1350, status: 'let', landlordId: 'bl1', tenantId: 'bt1', managerId: 's5', inspectorId: 's10', managementType: 'full', lastInspection: '2024-06-15', nextInspection: '2025-07-10', compliance: { epc: { grade: 'D', expiry: '2027-03-01', status: 'valid' }, gasSafety: { expiry: '2025-06-21', engineer: 'Midlands Gas Services', status: 'expiring_soon' }, eicr: { expiry: '2028-03-01', engineer: 'Apex Electrical', status: 'valid' }, smokeAlarm: { lastCheck: '2025-01-10', status: 'valid' }, depositProtection: { scheme: 'DPS', reference: 'DPS-2024-88321', amount: 1558, status: 'valid' }, rightToRent: { tenantId: 'bt1', status: 'valid', expiry: '2026-04-10' } } },
+  { id: 'bp2', address: '17 Balsall Heath Road', city: 'Birmingham', postcode: 'B12 8UD', branch: 'Birmingham', type: 'Flat', bedrooms: 2, bathrooms: 1, rent: 1100, status: 'let', landlordId: 'bl1', tenantId: 'bt2', managerId: 's5', inspectorId: 's10', managementType: 'full', lastInspection: '2025-01-20', nextInspection: '2025-07-20', compliance: { epc: { grade: 'E', expiry: '2025-11-01', status: 'valid' }, gasSafety: { expiry: '2025-09-15', engineer: 'Midlands Gas Services', status: 'valid' }, eicr: { expiry: '2024-12-01', engineer: 'Apex Electrical', status: 'expired' }, smokeAlarm: { lastCheck: '2025-01-20', status: 'valid' }, depositProtection: { scheme: 'TDS', reference: 'TDS-2024-44210', amount: 1269, status: 'valid' }, rightToRent: { tenantId: 'bt2', status: 'expiring_soon', expiry: '2025-08-20' } } },
+  { id: 'bp3', address: '8 Edgbaston Park Road', city: 'Birmingham', postcode: 'B15 2RA', branch: 'Birmingham', type: 'House', bedrooms: 4, bathrooms: 2, rent: 2200, status: 'let', landlordId: 'bl1', tenantId: 'bt3', managerId: 's5', inspectorId: 's10', managementType: 'full', lastInspection: '2025-05-28', nextInspection: '2025-11-28', compliance: { epc: { grade: 'C', expiry: '2030-01-01', status: 'valid' }, gasSafety: { expiry: '2025-12-10', engineer: 'Midlands Gas Services', status: 'valid' }, eicr: { expiry: '2029-12-10', engineer: 'Apex Electrical', status: 'valid' }, smokeAlarm: { lastCheck: '2025-05-28', status: 'valid' }, depositProtection: { scheme: 'DPS', reference: 'DPS-2024-99112', amount: 2538, status: 'valid' }, rightToRent: { tenantId: 'bt3', status: 'valid', expiry: '2027-01-15' } } },
+  { id: 'bp4', address: '31 Handsworth Wood Road', city: 'Birmingham', postcode: 'B20 2DY', branch: 'Birmingham', type: 'Flat', bedrooms: 2, bathrooms: 1, rent: 950, status: 'let', landlordId: 'bl2', tenantId: 'bt4', managerId: 's5', inspectorId: 's10', managementType: 'rent_collection', lastInspection: '2024-08-10', nextInspection: '2025-02-10', compliance: { epc: { grade: 'D', expiry: '2026-08-01', status: 'valid' }, gasSafety: { expiry: '2025-07-22', engineer: 'City Gas Ltd', status: 'valid' }, eicr: { expiry: '2027-07-22', engineer: 'Apex Electrical', status: 'valid' }, smokeAlarm: { lastCheck: '2024-08-10', status: 'overdue' }, depositProtection: { scheme: 'myDeposits', reference: 'MYD-2023-55441', amount: 1096, status: 'valid' }, rightToRent: { tenantId: 'bt4', status: 'not_verified', expiry: null } } },
+  { id: 'bp5', address: '55 Harborne Lane', city: 'Birmingham', postcode: 'B17 0NE', branch: 'Birmingham', type: 'House', bedrooms: 3, bathrooms: 1, rent: 1600, status: 'let', landlordId: 'bl2', tenantId: 'bt5', managerId: 's5', inspectorId: 's10', managementType: 'full', lastInspection: '2025-02-14', nextInspection: '2025-08-14', compliance: { epc: { grade: 'C', expiry: '2028-05-01', status: 'valid' }, gasSafety: { expiry: '2025-10-08', engineer: 'Midlands Gas Services', status: 'valid' }, eicr: { expiry: '2028-10-08', engineer: 'Apex Electrical', status: 'valid' }, smokeAlarm: { lastCheck: '2025-02-14', status: 'valid' }, depositProtection: { scheme: 'TDS', reference: 'TDS-2025-11088', amount: 1846, status: 'valid' }, rightToRent: { tenantId: 'bt5', status: 'valid', expiry: '2026-11-30' } } },
+  { id: 'bp6', address: '9 Stirchley Terrace', city: 'Birmingham', postcode: 'B30 2JT', branch: 'Birmingham', type: 'Flat', bedrooms: 1, bathrooms: 1, rent: 800, status: 'void', landlordId: 'bl3', tenantId: null, managerId: 's5', inspectorId: 's10', managementType: 'full', lastInspection: null, nextInspection: null, compliance: { epc: { grade: 'D', expiry: '2027-09-01', status: 'valid' }, gasSafety: { expiry: '2025-08-30', engineer: 'City Gas Ltd', status: 'valid' }, eicr: { expiry: '2028-08-30', engineer: 'Apex Electrical', status: 'valid' }, smokeAlarm: { lastCheck: '2025-04-01', status: 'valid' }, depositProtection: { scheme: null, reference: null, amount: 0, status: 'n/a' }, rightToRent: { tenantId: null, status: 'n/a', expiry: null } } },
 ]
 
 export const TENANCIES = [
@@ -364,6 +382,12 @@ export const TENANCIES = [
   { id: 'ten10', propertyId: 'p10', tenantId: 't10', startDate: '2024-03-01', endDate: '2026-03-01', monthlyRent: 4500, depositAmount: 5192, depositScheme: 'DPS', status: 'active', arrears: 0, lastPaymentDate: '2025-02-01', lastPayment: 4500, renewalOffered: false },
   { id: 'ten11', propertyId: 'p11', tenantId: 't11', startDate: '2022-08-01', endDate: '2024-08-01', monthlyRent: 1800, depositAmount: 2077, depositScheme: 'myDeposits', status: 'expired', arrears: 5400, lastPaymentDate: '2024-10-01', lastPayment: 1800, renewalOffered: false },
   { id: 'ten12', propertyId: 'p12', tenantId: 't12', startDate: '2024-05-01', endDate: '2025-05-01', monthlyRent: 3100, depositAmount: 3577, depositScheme: 'TDS', status: 'ending_soon', arrears: 0, lastPaymentDate: '2025-02-01', lastPayment: 3100, renewalOffered: true },
+  // Birmingham tenancies
+  { id: 'bten1', propertyId: 'bp1', tenantId: 'bt1', startDate: '2024-02-01', endDate: '2026-02-01', monthlyRent: 1350, depositAmount: 1558, depositScheme: 'DPS', status: 'active', arrears: 0, lastPaymentDate: '2025-06-01', lastPayment: 1350, renewalOffered: false },
+  { id: 'bten2', propertyId: 'bp2', tenantId: 'bt2', startDate: '2023-09-01', endDate: '2025-09-01', monthlyRent: 1100, depositAmount: 1269, depositScheme: 'TDS', status: 'active', arrears: 1100, lastPaymentDate: '2025-04-01', lastPayment: 1100, renewalOffered: false },
+  { id: 'bten3', propertyId: 'bp3', tenantId: 'bt3', startDate: '2024-06-01', endDate: '2026-06-01', monthlyRent: 2200, depositAmount: 2538, depositScheme: 'DPS', status: 'active', arrears: 0, lastPaymentDate: '2025-06-01', lastPayment: 2200, renewalOffered: false },
+  { id: 'bten4', propertyId: 'bp4', tenantId: 'bt4', startDate: '2023-01-01', endDate: '2025-01-01', monthlyRent: 950, depositAmount: 1096, depositScheme: 'myDeposits', status: 'expired', arrears: 0, lastPaymentDate: '2025-05-01', lastPayment: 950, renewalOffered: false },
+  { id: 'bten5', propertyId: 'bp5', tenantId: 'bt5', startDate: '2024-10-01', endDate: '2026-10-01', monthlyRent: 1600, depositAmount: 1846, depositScheme: 'TDS', status: 'active', arrears: 0, lastPaymentDate: '2025-06-01', lastPayment: 1600, renewalOffered: false },
 ]
 
 export const MAINTENANCE_JOBS = [
@@ -451,6 +475,13 @@ export const MAINTENANCE_JOBS = [
     aiTriage: 'Routine — cosmetic but could lead to water damage if left. Re-tiling completed.',
     photos: [], tenantName: 'Anna Petrov'
   },
+  // Birmingham maintenance
+  { id: 'bm1', propertyId: 'bp2', title: 'Boiler replacement — awaiting landlord approval', description: 'Boiler over 15 years old. Engineer attended and confirmed full replacement needed (£2,200). Tenant has no heating. Awaiting written landlord approval before proceeding.', priority: 'urgent', status: 'on_hold', reportedBy: 'tenant', reportedDate: '2025-05-27', assignedTo: 'c2', estimatedCost: 2200, actualCost: null, dueDate: '2025-06-05', aiTriage: 'Urgent — tenant without heating. Landlord approval required before contractor can proceed. Legal obligation to provide heating. Recommend escalation if no response within 24 hours.', photos: [], tenantName: 'Amara Diallo',
+    timeline: [ { date: '2025-05-27', text: 'Tenant reported no heating. Boiler showing fault code E3.' }, { date: '2025-05-28', text: 'Capital Gas Services attended. Boiler beyond repair. Quote: £2,200 for combi replacement.' }, { date: '2025-05-29', text: 'Landlord (Patel Property Group) contacted by email. Awaiting approval.' }, { date: '2025-05-30', text: 'Reminder sent. Temporary electric heater arranged for tenant.' } ] },
+  { id: 'bm2', propertyId: 'bp1', title: 'Bedroom window latch broken', description: 'Rear bedroom window latch has failed. Window cannot be secured. Tenant concerned about security.', priority: 'urgent', status: 'assigned', reportedBy: 'tenant', reportedDate: '2025-06-01', assignedTo: 'c7', estimatedCost: 150, actualCost: null, dueDate: '2025-06-07', aiTriage: 'Urgent — security vulnerability. Locksmith or general maintenance contractor required. Simple fix, low cost. Resolve within 48 hours.', photos: [], tenantName: 'Callum & Jade Brennan',
+    timeline: [ { date: '2025-06-01', text: 'Tenant reported broken window latch.' }, { date: '2025-06-02', text: 'FixIt Maintenance assigned. Appointment: 6 June 9am–12pm.' } ] },
+  { id: 'bm3', propertyId: 'bp5', title: 'Cracked bathroom floor tiles', description: 'Two tiles cracked near shower base. No water leakage currently but could become a problem.', priority: 'routine', status: 'new', reportedBy: 'inspector', reportedDate: '2025-05-14', assignedTo: null, estimatedCost: 180, actualCost: null, dueDate: null, aiTriage: 'Routine — cosmetic but could lead to damp if left. Tiler needed.', photos: [], tenantName: 'Tom & Sarah Whitfield',
+    timeline: [ { date: '2025-05-14', text: 'Noted during routine inspection by Ryan Blake.' } ] },
 ]
 
 export const INSPECTIONS = [
@@ -466,6 +497,11 @@ export const INSPECTIONS = [
   { id: 'ins10', propertyId: 'p7', address: '12 Maida Vale, W9 1RE', type: 'Mid-Tenancy', scheduledDate: '2025-06-10', status: 'scheduled', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Rachel & Paul Chen', accessConfirmed: false },
   { id: 'ins11', propertyId: 'p5', address: '3 Highgate Village, N6 5JT', type: 'Mid-Tenancy', scheduledDate: '2025-07-08', status: 'scheduled', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'James & Emma Wilson', accessConfirmed: false },
   { id: 'ins12', propertyId: 'p16', address: '8 Hemel Hempstead Lane, HP1 1BB', type: 'Check-In', scheduledDate: '2025-02-25', status: 'scheduled', inspectorId: 's11', inspectorName: 'Nadia Hassan', tenantName: 'New Tenant', accessConfirmed: true },
+  // Birmingham inspections
+  { id: 'bi1', propertyId: 'bp3', address: '8 Edgbaston Park Road, B15 2RA', type: 'Mid-Tenancy', scheduledDate: '2025-05-28', status: 'completed', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Stuart & Fiona MacLeod', accessConfirmed: true },
+  { id: 'bi2', propertyId: 'bp4', address: '31 Handsworth Wood Road, B20 2DY', type: 'Mid-Tenancy', scheduledDate: '2025-02-10', status: 'overdue', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Precious Adeyemi', accessConfirmed: false },
+  { id: 'bi3', propertyId: 'bp5', address: '55 Harborne Lane, B17 0NE', type: 'Mid-Tenancy', scheduledDate: '2025-08-14', status: 'scheduled', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Tom & Sarah Whitfield', accessConfirmed: true },
+  { id: 'bi4', propertyId: 'bp1', address: '42 Moseley Road, B12 9AA', type: 'Mid-Tenancy', scheduledDate: '2025-07-10', status: 'overdue', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Callum & Jade Brennan', accessConfirmed: false },
 ]
 
 export const RENT_TRANSACTIONS = [
@@ -583,171 +619,6 @@ export function getArrearsTenancies() {
     tenant: getTenantById(t.tenantId),
   }))
 }
-
-// ─── Birmingham Branch Data ───────────────────────────────────────────────────
-// Story: 6 properties in Birmingham with realistic compliance/maintenance issues
-
-export const BIRMINGHAM_LANDLORDS = [
-  { id: 'bl1', name: 'Patel Property Group', email: 'accounts@patelproperty.co.uk', phone: '07812 445 221', properties: ['bp1','bp2','bp3'], type: 'Investor', managementFee: 9, statementFrequency: 'monthly', preferredContact: 'email', balance: 14200, rating: 5 },
-  { id: 'bl2', name: 'Derek & Carol Simmons', email: 'd.simmons@gmail.com', phone: '07734 882 113', properties: ['bp4','bp5'], type: 'Portfolio', managementFee: 10, statementFrequency: 'monthly', preferredContact: 'phone', balance: 3800, rating: 4 },
-  { id: 'bl3', name: 'Yusuf Okafor', email: 'y.okafor@outlook.com', phone: '07923 667 445', properties: ['bp6'], type: 'Single', managementFee: 12, statementFrequency: 'monthly', preferredContact: 'email', balance: 1200, rating: 4 },
-]
-
-export const BIRMINGHAM_TENANTS = [
-  { id: 'bt1', name: 'Callum & Jade Brennan', email: 'callum.brennan@gmail.com', phone: '07812 334 991', propertyId: 'bp1', rtRVerified: true, rtRExpiry: '2026-04-10', nationality: 'British' },
-  { id: 'bt2', name: 'Amara Diallo', email: 'a.diallo@yahoo.co.uk', phone: '07923 445 770', propertyId: 'bp2', rtRVerified: true, rtRExpiry: '2025-08-20', nationality: 'French (EU Pre-settled)' },
-  { id: 'bt3', name: 'Stuart & Fiona MacLeod', email: 'stuartfiona@gmail.com', phone: '07611 224 887', propertyId: 'bp3', rtRVerified: true, rtRExpiry: '2027-01-15', nationality: 'British' },
-  { id: 'bt4', name: 'Precious Adeyemi', email: 'p.adeyemi@gmail.com', phone: '07845 667 334', propertyId: 'bp4', rtRVerified: false, rtRExpiry: null, nationality: 'Nigerian (Visa required)' },
-  { id: 'bt5', name: 'Tom & Sarah Whitfield', email: 'whitfields@gmail.com', phone: '07712 990 445', propertyId: 'bp5', rtRVerified: true, rtRExpiry: '2026-11-30', nationality: 'British' },
-  { id: 'bt6', name: 'Lena Grabowski', email: 'l.grabowski@outlook.com', phone: '07934 112 889', propertyId: 'bp6', rtRVerified: true, rtRExpiry: '2025-09-05', nationality: 'Polish (EU Pre-settled)' },
-]
-
-export const BIRMINGHAM_PROPERTIES = [
-  // bp1 — Story: Gas Safety expiring in 18 days, mid-tenancy inspection overdue
-  {
-    id: 'bp1', address: '42 Moseley Road', city: 'Birmingham', postcode: 'B12 9AA', branch: 'Birmingham',
-    type: 'Terrace', bedrooms: 3, bathrooms: 1, rent: 1350, status: 'let',
-    landlordId: 'bl1', tenantId: 'bt1', managerId: 's5', inspectorId: 's10',
-    managementType: 'full', lastInspection: '2024-06-15', nextInspection: '2024-12-15',
-    compliance: {
-      epc:               { grade: 'D', expiry: '2027-03-01',  status: 'valid' },
-      gasSafety:         { expiry: '2025-06-21', engineer: 'Midlands Gas Services', status: 'expiring_soon' },
-      eicr:              { expiry: '2028-03-01', engineer: 'Apex Electrical', status: 'valid' },
-      smokeAlarm:        { lastCheck: '2025-01-10', status: 'valid' },
-      depositProtection: { scheme: 'DPS', reference: 'DPS-2024-88321', amount: 1558, status: 'valid' },
-      rightToRent:       { tenantId: 'bt1', status: 'valid', expiry: '2026-04-10' },
-    }
-  },
-  // bp2 — Story: EICR expired, boiler issue waiting for landlord approval
-  {
-    id: 'bp2', address: '17 Balsall Heath Road', city: 'Birmingham', postcode: 'B12 8UD', branch: 'Birmingham',
-    type: 'Flat', bedrooms: 2, bathrooms: 1, rent: 1100, status: 'let',
-    landlordId: 'bl1', tenantId: 'bt2', managerId: 's5', inspectorId: 's10',
-    managementType: 'full', lastInspection: '2025-01-20', nextInspection: '2025-07-20',
-    compliance: {
-      epc:               { grade: 'E', expiry: '2025-11-01', status: 'valid' },
-      gasSafety:         { expiry: '2025-09-15', engineer: 'Midlands Gas Services', status: 'valid' },
-      eicr:              { expiry: '2024-12-01', engineer: 'Apex Electrical', status: 'expired' },
-      smokeAlarm:        { lastCheck: '2025-01-20', status: 'valid' },
-      depositProtection: { scheme: 'TDS', reference: 'TDS-2024-44210', amount: 1269, status: 'valid' },
-      rightToRent:       { tenantId: 'bt2', status: 'expiring_soon', expiry: '2025-08-20' },
-    }
-  },
-  // bp3 — Story: Recently completed inspection, all clean
-  {
-    id: 'bp3', address: '8 Edgbaston Park Road', city: 'Birmingham', postcode: 'B15 2RA', branch: 'Birmingham',
-    type: 'House', bedrooms: 4, bathrooms: 2, rent: 2200, status: 'let',
-    landlordId: 'bl1', tenantId: 'bt3', managerId: 's5', inspectorId: 's10',
-    managementType: 'full', lastInspection: '2025-05-28', nextInspection: '2025-11-28',
-    compliance: {
-      epc:               { grade: 'C', expiry: '2030-01-01', status: 'valid' },
-      gasSafety:         { expiry: '2025-12-10', engineer: 'Midlands Gas Services', status: 'valid' },
-      eicr:              { expiry: '2029-12-10', engineer: 'Apex Electrical', status: 'valid' },
-      smokeAlarm:        { lastCheck: '2025-05-28', status: 'valid' },
-      depositProtection: { scheme: 'DPS', reference: 'DPS-2024-99112', amount: 2538, status: 'valid' },
-      rightToRent:       { tenantId: 'bt3', status: 'valid', expiry: '2027-01-15' },
-    }
-  },
-  // bp4 — Story: RTR not verified, smoke alarm overdue
-  {
-    id: 'bp4', address: '31 Handsworth Wood Road', city: 'Birmingham', postcode: 'B20 2DY', branch: 'Birmingham',
-    type: 'Flat', bedrooms: 2, bathrooms: 1, rent: 950, status: 'let',
-    landlordId: 'bl2', tenantId: 'bt4', managerId: 's5', inspectorId: 's10',
-    managementType: 'rent_collection', lastInspection: '2024-08-10', nextInspection: '2025-02-10',
-    compliance: {
-      epc:               { grade: 'D', expiry: '2026-08-01', status: 'valid' },
-      gasSafety:         { expiry: '2025-07-22', engineer: 'City Gas Ltd', status: 'valid' },
-      eicr:              { expiry: '2027-07-22', engineer: 'Apex Electrical', status: 'valid' },
-      smokeAlarm:        { lastCheck: '2024-08-10', status: 'overdue' },
-      depositProtection: { scheme: 'myDeposits', reference: 'MYD-2023-55441', amount: 1096, status: 'valid' },
-      rightToRent:       { tenantId: 'bt4', status: 'not_verified', expiry: null },
-    }
-  },
-  // bp5 — Story: Good standing, upcoming inspection confirmed
-  {
-    id: 'bp5', address: '55 Harborne Lane', city: 'Birmingham', postcode: 'B17 0NE', branch: 'Birmingham',
-    type: 'House', bedrooms: 3, bathrooms: 1, rent: 1600, status: 'let',
-    landlordId: 'bl2', tenantId: 'bt5', managerId: 's5', inspectorId: 's10',
-    managementType: 'full', lastInspection: '2025-02-14', nextInspection: '2025-08-14',
-    compliance: {
-      epc:               { grade: 'C', expiry: '2028-05-01', status: 'valid' },
-      gasSafety:         { expiry: '2025-10-08', engineer: 'Midlands Gas Services', status: 'valid' },
-      eicr:              { expiry: '2028-10-08', engineer: 'Apex Electrical', status: 'valid' },
-      smokeAlarm:        { lastCheck: '2025-02-14', status: 'valid' },
-      depositProtection: { scheme: 'TDS', reference: 'TDS-2025-11088', amount: 1846, status: 'valid' },
-      rightToRent:       { tenantId: 'bt5', status: 'valid', expiry: '2026-11-30' },
-    }
-  },
-  // bp6 — Story: Void property, being refurbished
-  {
-    id: 'bp6', address: '9 Stirchley Terrace', city: 'Birmingham', postcode: 'B30 2JT', branch: 'Birmingham',
-    type: 'Flat', bedrooms: 1, bathrooms: 1, rent: 800, status: 'void',
-    landlordId: 'bl3', tenantId: null, managerId: 's5', inspectorId: 's10',
-    managementType: 'full', lastInspection: null, nextInspection: null,
-    compliance: {
-      epc:               { grade: 'D', expiry: '2027-09-01', status: 'valid' },
-      gasSafety:         { expiry: '2025-08-30', engineer: 'City Gas Ltd', status: 'valid' },
-      eicr:              { expiry: '2028-08-30', engineer: 'Apex Electrical', status: 'valid' },
-      smokeAlarm:        { lastCheck: '2025-04-01', status: 'valid' },
-      depositProtection: { scheme: null, reference: null, amount: 0, status: 'n/a' },
-      rightToRent:       { tenantId: null, status: 'n/a', expiry: null },
-    }
-  },
-]
-
-export const BIRMINGHAM_MAINTENANCE = [
-  // Story: Boiler breakdown — waiting for landlord approval on replacement
-  {
-    id: 'bm1', propertyId: 'bp2', title: 'Boiler not heating — awaiting landlord approval for replacement',
-    description: 'Boiler over 15 years old. Engineer attended and confirmed it needs full replacement (£2,200). Tenant has no heating. Awaiting written landlord approval before proceeding.',
-    priority: 'urgent', status: 'on_hold', reportedBy: 'tenant', reportedDate: '2025-05-27',
-    assignedTo: 'c2', estimatedCost: 2200, actualCost: null, dueDate: '2025-06-05',
-    aiTriage: 'Urgent — tenant without adequate heating. Landlord approval required before contractor can proceed. Legal obligation to maintain heating. Recommend escalation if no response within 24 hours.',
-    tenantName: 'Amara Diallo',
-    timeline: [
-      { date: '2025-05-27', type: 'report', text: 'Tenant reported no heating. Boiler showing fault code E3.' },
-      { date: '2025-05-28', type: 'visit', text: 'Capital Gas Services attended. Confirmed boiler beyond economical repair. Quote submitted: £2,200 for combi replacement.' },
-      { date: '2025-05-29', type: 'note', text: 'Landlord (Patel Property Group) contacted by email. Awaiting approval.' },
-      { date: '2025-05-30', type: 'note', text: 'Reminder sent to landlord. Temporary electric heater arranged for tenant.' },
-    ]
-  },
-  // Story: Routine repair — window latch
-  {
-    id: 'bm2', propertyId: 'bp1', title: 'Bedroom window latch broken — security risk',
-    description: 'Rear bedroom window latch has failed. Window cannot be secured. Tenant concerned about security.',
-    priority: 'urgent', status: 'assigned', reportedBy: 'tenant', reportedDate: '2025-06-01',
-    assignedTo: 'c7', estimatedCost: 150, actualCost: null, dueDate: '2025-06-07',
-    aiTriage: 'Urgent — security vulnerability. Locksmith or general maintenance contractor required. Simple fix, low cost. Should be resolved within 48 hours.',
-    tenantName: 'Callum & Jade Brennan',
-    timeline: [
-      { date: '2025-06-01', text: 'Tenant reported broken window latch via portal.' },
-      { date: '2025-06-02', text: 'FixIt Maintenance assigned. Appointment confirmed for 6 June 9am–12pm.' },
-    ]
-  },
-  // Story: Cosmetic — bathroom tiles
-  {
-    id: 'bm3', propertyId: 'bp5', title: 'Cracked bathroom floor tiles',
-    description: 'Two tiles cracked near shower base. No water leakage currently but could become a problem.',
-    priority: 'routine', status: 'new', reportedBy: 'inspector', reportedDate: '2025-05-14',
-    assignedTo: null, estimatedCost: 180, actualCost: null, dueDate: null,
-    aiTriage: 'Routine — cosmetic but could lead to damp if left. Tiler needed. No immediate risk.',
-    tenantName: 'Tom & Sarah Whitfield',
-    timeline: [
-      { date: '2025-05-14', text: 'Noted during routine inspection by Ryan Blake.' },
-    ]
-  },
-]
-
-export const BIRMINGHAM_INSPECTIONS = [
-  // Recently completed
-  { id: 'bi1', propertyId: 'bp3', address: '8 Edgbaston Park Road, B15 2RA', type: 'Mid-Tenancy', scheduledDate: '2025-05-28', status: 'completed', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Stuart & Fiona MacLeod', accessConfirmed: true },
-  // Overdue
-  { id: 'bi2', propertyId: 'bp4', address: '31 Handsworth Wood Road, B20 2DY', type: 'Mid-Tenancy', scheduledDate: '2025-02-10', status: 'overdue', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Precious Adeyemi', accessConfirmed: false },
-  // Upcoming confirmed
-  { id: 'bi3', propertyId: 'bp5', address: '55 Harborne Lane, B17 0NE', type: 'Mid-Tenancy', scheduledDate: '2025-08-14', status: 'scheduled', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Tom & Sarah Whitfield', accessConfirmed: true },
-  // Upcoming not confirmed
-  { id: 'bi4', propertyId: 'bp1', address: '42 Moseley Road, B12 9AA', type: 'Mid-Tenancy', scheduledDate: '2025-07-10', status: 'overdue', inspectorId: 's10', inspectorName: 'Ryan Blake', tenantName: 'Callum & Jade Brennan', accessConfirmed: false },
-]
 
 // Maintenance job notes store (mutable in localStorage by users)
 const JOB_NOTES_KEY = 'propertyops_job_notes'

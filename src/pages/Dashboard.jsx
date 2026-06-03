@@ -15,8 +15,7 @@ import {
 import {
   PROPERTIES, TENANCIES, MAINTENANCE_JOBS, INSPECTIONS, TASKS,
   ACTIVITY_FEED, RENT_COLLECTION_CHART, BRANCH_PERFORMANCE,
-  STAFF, getComplianceSummary, getTotalArrears, getArrearsTenancies,
-  BIRMINGHAM_PROPERTIES, BIRMINGHAM_MAINTENANCE, BIRMINGHAM_INSPECTIONS
+  STAFF, getComplianceSummary, getTotalArrears, getArrearsTenancies
 } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 
@@ -181,11 +180,6 @@ function OwnerDashboard({ data }) {
   const navigate = useNavigate()
   const t = useThemeColors()
 
-  // Merge Birmingham data into totals
-  const allProperties   = [...PROPERTIES, ...BIRMINGHAM_PROPERTIES]
-  const allMaintenance  = [...MAINTENANCE_JOBS, ...BIRMINGHAM_MAINTENANCE]
-  const allInspections  = [...INSPECTIONS, ...BIRMINGHAM_INSPECTIONS]
-
   const handleAISummary = async () => {
     if (aiText) { setAiOpen(true); return }
     setAiLoading(true)
@@ -210,20 +204,18 @@ function OwnerDashboard({ data }) {
   const compliance = getComplianceSummary()
   const totalArrears = getTotalArrears()
   const arrearsTenancies = getArrearsTenancies()
-  const allOverdueInspections = [...inspections, ...allInspections].filter(i => i.status === 'overdue')
-  const allOpenJobs = [...jobs, ...allMaintenance].filter(j => j.status !== 'completed')
-  const emergencyJobs = allOpenJobs.filter(j => j.priority === 'emergency')
-  const overdueInspections = allOverdueInspections
-  const openJobs = allOpenJobs
+  const overdueInspections = INSPECTIONS.filter(i => i.status === 'overdue')
+  const openJobs = MAINTENANCE_JOBS.filter(j => j.status !== 'completed')
+  const emergencyJobs = openJobs.filter(j => j.priority === 'emergency')
   const overdueTasksCount = TASKS.filter(t => t.status === 'overdue').length
 
   // Today's priorities — specific actionable items
   const todayPriorities = [
-    ...allOpenJobs.filter(j => j.priority === 'emergency' || j.priority === 'urgent').slice(0, 2).map(j => ({
+    ...openJobs.filter(j => j.priority === 'emergency' || j.priority === 'urgent').slice(0, 2).map(j => ({
       type: 'maintenance', severity: j.priority === 'emergency' ? 'critical' : 'warning',
       title: j.title, sub: j.tenantName, link: '/maintenance'
     })),
-    ...allOverdueInspections.slice(0, 2).map(i => ({
+    ...overdueInspections.slice(0, 2).map(i => ({
       type: 'inspection', severity: 'warning',
       title: `Inspection overdue — ${i.address?.split(',')[0]}`, sub: i.tenantName, link: '/inspections'
     })),
@@ -295,7 +287,7 @@ function OwnerDashboard({ data }) {
         <KPICard label="Compliance Risks" value={compliance.expired + compliance.expiringSoon} sub={`${compliance.expired} expired`} icon={ShieldCheck} color="red" alert onClick={() => navigate('/compliance')} />
         <KPICard label="Inspections Due" value={overdueInspections.length} sub="overdue" icon={ClipboardCheck} color="amber" alert onClick={() => navigate('/inspections')} />
         <KPICard label="Open Maintenance" value={openJobs.length} sub={`${emergencyJobs.length} emergency`} icon={Wrench} color="amber" onClick={() => navigate('/maintenance')} />
-        <KPICard label="Properties" value={[...props, ...BIRMINGHAM_PROPERTIES].filter(p => p.status === 'let').length} sub={`${[...props, ...BIRMINGHAM_PROPERTIES].filter(p => p.status === 'void').length} void`} icon={Building2} color="blue" trend={2.4} onClick={() => navigate('/properties')} />
+        <KPICard label="Properties" value={PROPERTIES.filter(p => p.status === 'let').length} sub={`${PROPERTIES.filter(p => p.status === 'void').length} void`} icon={Building2} color="blue" trend={2.4} onClick={() => navigate('/properties')} />
         <KPICard label="Active Tenancies" value={tenancies.filter(t => t.status === 'active').length} sub="2 ending soon" icon={Users} color="green" trend={1.2} onClick={() => navigate('/tenancies')} />
       </div>
 
