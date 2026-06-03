@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Wrench, AlertTriangle, CheckCircle, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail } from 'lucide-react'
+import { Wrench, AlertTriangle, CheckCircle, Clock, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail } from 'lucide-react'
 import { MAINTENANCE_JOBS, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sendMaintenanceUpdate, sendContractorAssignment, sendJobCompletionToLandlord } from '../lib/email'
