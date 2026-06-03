@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Wrench, AlertTriangle, CheckCircle, Clock, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail, Send } from 'lucide-react'
+import { Wrench, AlertTriangle, CheckCircle, Clock, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail, Send, ExternalLink } from 'lucide-react'
 import { MAINTENANCE_JOBS, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH, getJobNotes, addJobNote } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sendMaintenanceUpdate, sendContractorAssignment, sendJobCompletionToLandlord } from '../lib/email'
@@ -29,7 +29,7 @@ export default function Maintenance() {
   const [noteText, setNoteText]             = useState({})
   const [notesMap, setNotesMap]             = useState({})
 
-  const ALL_JOBS = MAINTENANCE_JOBS
+  const ALL_JOBS = [...MAINTENANCE_JOBS, ...customJobs]
 
   const handleStatusChange = (jobId, status) => {
     setJobStatus(jobId, status)
@@ -48,6 +48,21 @@ export default function Maintenance() {
   const getNotes  = (job) => notesMap[job.id] ?? getJobNotes(job.id)
   const [aiTriageMap, setAiTriageMap]       = useState({})
   const [triagingId, setTriagingId]         = useState(null)
+  const [showLogJob, setShowLogJob]         = useState(false)
+  const [logJobForm, setLogJobForm]         = useState({ title:'', priority:'routine', description:'' })
+  const [customJobs, setCustomJobs]         = useState(() => { try { return JSON.parse(localStorage.getItem('propertyops_custom_jobs')||'[]') } catch { return [] } })
+  const [toast, setToast]                   = useState('')
+  const showJobToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
+  const saveJob = () => {
+    if (!logJobForm.title.trim()) return
+    const job = { id:'cj_'+Date.now(), ...logJobForm, status:'new', propertyId:null, assignedTo:null, reportedBy:'staff', reportedDate:new Date().toISOString().split('T')[0], estimatedCost:null, actualCost:null, dueDate:null, aiTriage:'', photos:[], tenantName:'', timeline:[] }
+    const updated = [job, ...customJobs]
+    setCustomJobs(updated)
+    localStorage.setItem('propertyops_custom_jobs', JSON.stringify(updated))
+    setLogJobForm({ title:'', priority:'routine', description:'' })
+    setShowLogJob(false)
+    showJobToast(`Job logged: ${job.title}`)
+  }
 
   const handleAITriage = async (job) => {
     const property = getPropertyById(job.propertyId)
@@ -134,7 +149,7 @@ export default function Maintenance() {
           }}>
             <Zap size={13} /> {'Triage All'}
           </button>
-          <button className="btn-primary"><Plus size={13} /> Log Job</button>
+          <button className="btn-primary" onClick={() => setShowLogJob(v => !v)}><Plus size={13} /> Log Job</button>
         </div>
       </div>
 
@@ -183,6 +198,48 @@ export default function Maintenance() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Log Job inline form */}
+      {showLogJob && (
+        <div style={{ background:'white', borderRadius:12, border:'1px solid #e2e8f0', padding:'16px 18px', marginBottom:16, boxShadow:'0 4px 16px rgba(0,0,0,0.06)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <p style={{ fontWeight:700, fontSize:14, color:'#0f172a' }}>Log New Maintenance Job</p>
+            <button onClick={() => setShowLogJob(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:18 }}>×</button>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <input value={logJobForm.title} onChange={e => setLogJobForm(f => ({...f, title:e.target.value}))}
+              placeholder="Job title e.g. Boiler not working *" autoFocus
+              style={{ border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13.5, outline:'none', fontFamily:'inherit', color:'#0f172a', width:'100%', boxSizing:'border-box' }}
+              onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:10 }}>
+              <select value={logJobForm.priority} onChange={e => setLogJobForm(f => ({...f, priority:e.target.value}))}
+                style={{ border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                <option value="emergency">🚨 Emergency</option>
+                <option value="urgent">⚡ Urgent</option>
+                <option value="routine">🔧 Routine</option>
+                <option value="cosmetic">🎨 Cosmetic</option>
+              </select>
+              <input value={logJobForm.description} onChange={e => setLogJobForm(f => ({...f, description:e.target.value}))}
+                placeholder="Brief description…"
+                style={{ border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', color:'#0f172a' }}
+                onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} />
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="btn-secondary" style={{ flex:1, justifyContent:'center', fontSize:13 }} onClick={() => setShowLogJob(false)}>Cancel</button>
+              <button className="btn-primary" style={{ flex:2, justifyContent:'center', fontSize:13 }} onClick={saveJob} disabled={!logJobForm.title.trim()}>
+                <Plus size={13} /> Log Job
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position:'fixed', bottom:90, left:'50%', transform:'translateX(-50%)', background:'#0f172a', color:'white', padding:'10px 20px', borderRadius:10, fontSize:13.5, fontWeight:600, zIndex:80, boxShadow:'0 8px 24px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:8 }}>
+          <CheckCircle size={15} color="#10b981" /> {toast}
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -344,7 +401,12 @@ export default function Maintenance() {
                       </button>
                     )}
 
-                    {!contractor && <button className="btn-primary" style={{ fontSize: 12 }}><Plus size={12} /> Assign Contractor</button>}
+                    {!contractor && (
+                      <button className="btn-primary" style={{ fontSize: 12 }}
+                        onClick={() => { handleJobStatus(job.id, 'triaged'); showJobToast('Job triaged — go to Contractors to assign') }}>
+                        <Plus size={12} /> Triage &amp; Assign
+                      </button>
+                    )}
                   </div>
 
                   {/* Status change */}

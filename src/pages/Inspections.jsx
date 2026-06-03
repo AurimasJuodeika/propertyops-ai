@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { ClipboardCheck, Calendar, User, AlertTriangle, Plus, Clock, CheckCircle, ExternalLink, ChevronRight, MapPin } from 'lucide-react'
-import { INSPECTIONS, getPropertyById } from '../data/mockData'
+import { ClipboardCheck, Calendar, User, AlertTriangle, Plus, Clock, CheckCircle, ExternalLink, ChevronRight, MapPin, Save, X } from 'lucide-react'
+import { INSPECTIONS, getPropertyById, PROPERTIES } from '../data/mockData'
 
 const TYPE_COLORS = {
   'Mid-Tenancy': { color: '#2563eb', bg: '#dbeafe' },
@@ -10,16 +10,34 @@ const TYPE_COLORS = {
 }
 
 export default function Inspections() {
-  const [filter, setFilter] = useState('All')
+  const [filter, setFilter]         = useState('All')
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [schedForm, setSchedForm]   = useState({ propertyId:'', type:'Mid-Tenancy', date:'', inspectorName:'Ryan Blake' })
+  const [customInspections, setCustomInspections] = useState(() => { try { return JSON.parse(localStorage.getItem('propertyops_custom_inspections')||'[]') } catch { return [] } })
+  const [toast, setToast]           = useState('')
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
-  const overdue    = INSPECTIONS.filter(i => i.status === 'overdue')
-  const scheduled  = INSPECTIONS.filter(i => i.status === 'scheduled')
+  const saveSchedule = () => {
+    if (!schedForm.propertyId || !schedForm.date) { alert('Please select a property and date.'); return }
+    const prop = PROPERTIES.find(p => p.id === schedForm.propertyId)
+    const ins = { id:'ci_'+Date.now(), ...schedForm, address:`${prop?.address}, ${prop?.postcode}`, status:'scheduled', tenantName: prop?.tenantId ? 'Tenant' : 'Vacant', accessConfirmed:false }
+    const updated = [ins, ...customInspections]
+    setCustomInspections(updated)
+    localStorage.setItem('propertyops_custom_inspections', JSON.stringify(updated))
+    setSchedForm({ propertyId:'', type:'Mid-Tenancy', date:'', inspectorName:'Ryan Blake' })
+    setShowSchedule(false)
+    showToast(`Inspection scheduled for ${prop?.address}`)
+  }
+
+  const ALL_INSPECTIONS = [...INSPECTIONS, ...customInspections]
+  const overdue    = ALL_INSPECTIONS.filter(i => i.status === 'overdue')
+  const scheduled  = ALL_INSPECTIONS.filter(i => i.status === 'scheduled')
   const upcoming30 = scheduled.filter(i => {
     const days = (new Date(i.scheduledDate) - new Date()) / (1000 * 60 * 60 * 24)
     return days <= 30
   })
 
-  const filtered = filter === 'All' ? INSPECTIONS : INSPECTIONS.filter(i => i.status === filter)
+  const filtered = filter === 'All' ? ALL_INSPECTIONS : ALL_INSPECTIONS.filter(i => i.status === filter)
   const sorted   = [...filtered].sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate))
 
   return (
@@ -34,7 +52,7 @@ export default function Inspections() {
           <a href="http://localhost:5173" target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ textDecoration: 'none' }}>
             <ExternalLink size={13} /> InspectPro
           </a>
-          <button className="btn-primary"><Plus size={13} /> Schedule</button>
+          <button className="btn-primary" onClick={() => setShowSchedule(v => !v)}><Plus size={13} /> Schedule</button>
         </div>
       </div>
 
@@ -63,6 +81,59 @@ export default function Inspections() {
           </div>
         ))}
       </div>
+
+      {/* Schedule inspection form */}
+      {showSchedule && (
+        <div style={{ background:'white', borderRadius:12, border:'1px solid #e2e8f0', padding:'16px 18px', marginBottom:16, boxShadow:'0 4px 16px rgba(0,0,0,0.06)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <p style={{ fontWeight:700, fontSize:14, color:'#0f172a' }}>Schedule Inspection</p>
+            <button onClick={() => setShowSchedule(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:18 }}>×</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+            <div>
+              <label style={{ display:'block', fontSize:11, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', marginBottom:5 }}>Property *</label>
+              <select value={schedForm.propertyId} onChange={e => setSchedForm(f => ({...f, propertyId:e.target.value}))}
+                style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                <option value="">— Select property —</option>
+                {PROPERTIES.map(p => <option key={p.id} value={p.id}>{p.address}, {p.postcode}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:11, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', marginBottom:5 }}>Type</label>
+              <select value={schedForm.type} onChange={e => setSchedForm(f => ({...f, type:e.target.value}))}
+                style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                {['Mid-Tenancy','Check-In','Check-Out','HMO'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:11, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', marginBottom:5 }}>Date *</label>
+              <input type="date" value={schedForm.date} onChange={e => setSchedForm(f => ({...f, date:e.target.value}))}
+                style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit' }} />
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:11, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', marginBottom:5 }}>Inspector</label>
+              <select value={schedForm.inspectorName} onChange={e => setSchedForm(f => ({...f, inspectorName:e.target.value}))}
+                style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                <option>Ryan Blake</option>
+                <option>Nadia Hassan</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="btn-secondary" style={{ flex:1, justifyContent:'center', fontSize:13 }} onClick={() => setShowSchedule(false)}>Cancel</button>
+            <button className="btn-primary" style={{ flex:2, justifyContent:'center', fontSize:13 }} onClick={saveSchedule}>
+              <Save size={13} /> Schedule Inspection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position:'fixed', bottom:90, left:'50%', transform:'translateX(-50%)', background:'#0f172a', color:'white', padding:'10px 20px', borderRadius:10, fontSize:13.5, fontWeight:600, zIndex:80, boxShadow:'0 8px 24px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:8 }}>
+          <CheckCircle size={15} color="#10b981" /> {toast}
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>

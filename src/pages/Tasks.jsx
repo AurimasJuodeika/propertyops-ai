@@ -167,7 +167,14 @@ export default function Tasks() {
               <span className={`badge ${sc?.class || 'badge-slate'}`}>{sc?.label || task.status}</span>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                 {task.status !== 'completed' && (
-                  <button className="btn-secondary" style={{ fontSize: 11, padding: '4px 8px' }}>
+                  <button className="btn-secondary" style={{ fontSize: 11, padding: '4px 8px' }}
+                    onClick={() => {
+                      if (task.id.startsWith('ct_')) {
+                        const updated = customTasks.map(t => t.id === task.id ? { ...t, status: 'completed' } : t)
+                        setCustomTasks(updated)
+                        localStorage.setItem('propertyops_custom_tasks', JSON.stringify(updated))
+                      }
+                    }}>
                     <CheckCircle size={10} /> Done
                   </button>
                 )}

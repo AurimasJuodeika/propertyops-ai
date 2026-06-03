@@ -56,7 +56,7 @@ export default function Contractors() {
           <h1 className="page-title">Contractor Management</h1>
           <p className="page-subtitle">{CONTRACTORS.length} approved contractors across all trades</p>
         </div>
-        <button className="btn-primary"><Plus size={13} /> Add Contractor</button>
+        <button className="btn-primary" onClick={() => alert("Add Contractor: coming in next sprint — will include trade, accreditations, rate and contact details.")}><Plus size={13} /> Add Contractor</button>
       </div>
 
       {/* Trade filter chips */}

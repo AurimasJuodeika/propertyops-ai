@@ -233,7 +233,7 @@ Harrington & Co Property Management` : ''
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn-secondary" onClick={() => { if (!selected) { alert('Select a landlord first.'); return } setShowAIUpdate(true) }}><Zap size={13} /> Send AI Update</button>
-          <button className="btn-primary"><Plus size={13} /> Add Landlord</button>
+          <button className="btn-primary" onClick={() => alert("Add Landlord: enter name, contact, management fee and linked properties. Coming in next sprint.")}><Plus size={13} /> Add Landlord</button>
         </div>
       </div>
 

@@ -199,7 +199,7 @@ export default function Tenants() {
           <h1 className="page-title">Tenants</h1>
           <p className="page-subtitle">{TENANTS.length} active tenants · {rtrIssues} RTR not verified · {expiringSoon} expiring soon</p>
         </div>
-        <button className="btn-primary"><Plus size={13} /> Add Tenant</button>
+        <button className="btn-primary" onClick={() => setEditingTenant({ id:'ct_'+Date.now(), name:"", email:"", phone:"", nationality:"British", isCustom:true })}><Plus size={13} /> Add Tenant</button>
       </div>
 
       {/* RTR legend */}
@@ -396,7 +396,10 @@ export default function Tenants() {
         <EditTenantModal
           tenant={editingTenant}
           onSave={(updated) => {
-            const all = customTenants.map(t => t.id === updated.id ? updated : t)
+            const exists = customTenants.find(t => t.id === updated.id)
+            const all = exists
+              ? customTenants.map(t => t.id === updated.id ? updated : t)
+              : [updated, ...customTenants]
             localStorage.setItem('propertyops_custom_tenants', JSON.stringify(all))
             setCustomTenants(all)
             setEditingTenant(null)
