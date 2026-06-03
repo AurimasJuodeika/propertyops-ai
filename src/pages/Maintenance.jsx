@@ -102,7 +102,13 @@ export default function Maintenance() {
           <p className="page-subtitle">{openJobs.length} open jobs · £{totalEstimated.toLocaleString()} estimated spend</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-secondary" onClick={() => filtered.filter(j => j.status !== 'completed').forEach(j => handleAITriage(j))}>
+          <button className="btn-secondary" onClick={async () => {
+            const jobs = filtered.filter(j => j.status !== 'completed')
+            for (const j of jobs) {
+              await handleAITriage(j)
+              await new Promise(r => setTimeout(r, 500)) // 500ms between calls
+            }
+          }}>
             <Zap size={13} /> {isAIConfigured ? 'AI Triage All (Live)' : 'AI Triage All'}
           </button>
           <button className="btn-primary"><Plus size={13} /> Log Job</button>
