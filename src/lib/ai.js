@@ -1,16 +1,10 @@
-const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
+// Use /api/ai proxy on deployed site, direct call on localhost
+const PROXY_URL = '/api/ai'
 
 async function claude(prompt, maxTokens = 800) {
-  if (!API_KEY) throw new Error('Anthropic API key not configured.')
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch(PROXY_URL, {
     method: 'POST',
-    headers: {
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-calls': 'true',
-    },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: maxTokens,
@@ -150,4 +144,5 @@ Plain text, no markdown. Under 200 words.`
   return claude(prompt, 400)
 }
 
-export const isAIConfigured = !!API_KEY
+// AI is always available — key is server-side only
+export const isAIConfigured = true
