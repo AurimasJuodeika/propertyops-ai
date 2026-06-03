@@ -16,7 +16,7 @@ export default function Properties() {
   const [search, setSearch]             = useState('')
   const [branchFilter, setBranchFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
-  const [editingRent, setEditingRent]   = useState(null)
+  const [editingRent, setEditingRent]     = useState(null) // { property, anchorRect }
   const [rentOverrides, setRentOverrides] = useState(getPropertyOverrides())
 
   const filtered = PROPERTIES.filter(p => {
@@ -127,7 +127,7 @@ export default function Properties() {
                             </p>
                           )}
                         </div>
-                        <button onClick={e => { e.stopPropagation(); setEditingRent(p) }}
+                        <button onClick={e => { e.stopPropagation(); setEditingRent({ property: p, anchorRect: e.currentTarget.getBoundingClientRect() }) }}
                           title="Edit rent"
                           style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #e2e8f0', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
                           <Edit2 size={11} color="#64748b" />
@@ -210,11 +210,12 @@ export default function Properties() {
         })}
       </div>
 
-      {/* Rent edit modal */}
+      {/* Rent edit popover */}
       {editingRent && (
         <RentEditModal
-          property={editingRent}
-          onSave={(propertyId) => setRentOverrides(getPropertyOverrides())}
+          property={editingRent.property}
+          anchorRect={editingRent.anchorRect}
+          onSave={() => setRentOverrides(getPropertyOverrides())}
           onClose={() => setEditingRent(null)}
         />
       )}

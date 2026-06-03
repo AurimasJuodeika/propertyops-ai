@@ -349,7 +349,7 @@ Harrington & Co Property Management` : ''
                           )}
                         </div>
                         {/* Edit rent button */}
-                        <button onClick={() => setEditingRent(p)} title="Edit rent"
+                        <button onClick={e => setEditingRent({ property: p, anchorRect: e.currentTarget.getBoundingClientRect() })} title="Edit rent"
                           style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                           <Edit2 size={12} color="#64748b" />
                         </button>
@@ -384,10 +384,11 @@ Harrington & Co Property Management` : ''
         )}
       </div>
 
-      {/* Rent edit modal */}
+      {/* Rent edit popover */}
       {editingRent && (
         <RentEditModal
-          property={editingRent}
+          property={editingRent.property || editingRent}
+          anchorRect={editingRent.anchorRect}
           onSave={handleRentSave}
           onClose={() => setEditingRent(null)}
         />
