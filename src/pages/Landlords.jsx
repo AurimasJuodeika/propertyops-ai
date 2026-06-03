@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
-import { Users, Star, PoundSterling, Building2, Plus, Zap, Mail, Phone, CheckCircle, X, Save, Trash2, Edit2, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Users, Star, PoundSterling, Building2, Plus, Zap, Mail, Phone, CheckCircle, X, Save, Trash2, Edit2, TrendingUp, TrendingDown, ArrowRight, Eye, Archive } from 'lucide-react'
 import { LANDLORDS, PROPERTIES, TENANCIES } from '../data/mockData'
 import PDFButton from '../components/PDFButton'
 import { generateLandlordStatement } from '../lib/pdfExport'
 import { sendLandlordUpdate } from '../lib/email'
 import { getPropertyOverrides, setPropertyOverride, getLandlordOverrides, setLandlordOverride, getNewProperties, addNewProperty, removeNewProperty, getEffectiveRent, getCustomLandlords, getDeletedPropertyIds } from '../lib/propertyOverrides'
 import RentEditModal from '../components/RentEditModal'
+import AddEditLandlordModal from '../components/AddEditLandlordModal'
+import { getAllLandlords, getLandlordStats, getLandlordStatus, archiveLandlord, getArchivedLandlordIds } from '../lib/landlordStore'
 
 // ─── Rent Edit Modal ──────────────────────────────────────────────────────────
 // ─── Add Property Modal ───────────────────────────────────────────────────────
@@ -136,7 +139,12 @@ function AddPropertyModal({ landlordId, existingIds, onSave, onClose }) {
 
 // ─── Main Landlords page ──────────────────────────────────────────────────────
 export default function Landlords() {
+  const navigate = useNavigate()
   const [selected, setSelected]       = useState(null)
+  const [showAddLandlord, setShowAddLandlord] = useState(false)
+  const [showArchived, setShowArchived]       = useState(false)
+  const [refresh, setRefresh]                 = useState(0)
+  const doRefresh = () => setRefresh(r => r + 1)
   const [showAIUpdate, setShowAIUpdate] = useState(false)
   const [sending, setSending]         = useState(false)
   const [sent, setSent]               = useState(false)
@@ -172,36 +180,32 @@ Harrington & Co Property Management` : ''
     return baseProps
   }
 
-  // All landlords: mock + wizard-created + future added
-  const customLandlords = getCustomLandlords()
-  const deleted         = getDeletedPropertyIds()
-  const allNewProps     = getNewProperties().filter(p => !deleted.includes(p.id))
-  const allProperties   = [...PROPERTIES, ...allNewProps]
+  // All landlords via unified store (includes mock + Birmingham + custom)
+  const archived = getArchivedLandlordIds()
+  const allLandlords = getAllLandlords({ includeArchived: showArchived })
 
-  // For custom landlords, derive their property list from all properties
-  const getCustomPropertyList = (landlordId) => {
-    return allProperties.filter(p => p.landlordId === landlordId)
-  }
-
-  const enrichedLandlords = [
-    // Mock landlords (existing logic)
-    ...LANDLORDS.map(l => ({
+  const enrichedLandlords = allLandlords.map(l => {
+    // For mock landlords with existing override logic, use getPropertyList if available
+    let propList
+    if (!l.isCustom) {
+      propList = getPropertyList(l)
+    } else {
+      const deleted = getDeletedPropertyIds()
+      const allProps = [...PROPERTIES, ...getNewProperties()].filter(p => !deleted.includes(p.id))
+      propList = allProps.filter(p => p.landlordId === l.id)
+    }
+    const stats = getLandlordStats(l.id)
+    return {
       ...l,
-      propertyList: getPropertyList(l),
-      totalRent: getPropertyList(l).reduce((s, p) => s + getEffectiveRent(p), 0),
-      isCustom: false,
-    })),
-    // Custom/wizard-created landlords
-    ...customLandlords.map(l => {
-      const props = getCustomPropertyList(l.id)
-      return {
-        ...l,
-        propertyList: props,
-        totalRent: props.reduce((s, p) => s + getEffectiveRent(p), 0),
-        isCustom: true,
-      }
-    }),
-  ]
+      propertyList: propList,
+      totalRent: propList.reduce((s, p) => s + getEffectiveRent(p), 0),
+      stats,
+      portfolioStatus: getLandlordStatus(l.id),
+    }
+  })
+
+  // Legacy alias for detail panel
+  const customLandlords = allLandlords.filter(l => l.isCustom)
 
   const handleSendUpdate = async () => {
     if (!selected?.email) { alert('No email address for this landlord.'); return }
@@ -257,8 +261,11 @@ Harrington & Co Property Management` : ''
           <p className="page-subtitle">{enrichedLandlords.length} landlords · {enrichedLandlords.filter(l => l.type === 'Portfolio' || l.type === 'Investor').length} portfolio landlords{customLandlords.length > 0 ? ` · ${customLandlords.length} added` : ''}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-secondary" onClick={() => { if (!selected) { alert('Select a landlord first.'); return } setShowAIUpdate(true) }}><Zap size={13} /> Send AI Update</button>
-          <button className="btn-primary" onClick={() => alert("Add Landlord: enter name, contact, management fee and linked properties. Coming in next sprint.")}><Plus size={13} /> Add Landlord</button>
+          <button className="btn-secondary" onClick={() => setShowArchived(v => !v)} style={{ fontSize: 12 }}>
+            {showArchived ? 'Hide Archived' : 'Show Archived'}
+          </button>
+          <button className="btn-secondary" onClick={() => { if (!selected) { alert('Select a landlord first.'); return } setShowAIUpdate(true) }}><Zap size={13} /> AI Update</button>
+          <button className="btn-primary" onClick={() => setShowAddLandlord(true)}><Plus size={13} /> Add Landlord</button>
         </div>
       </div>
 
@@ -291,11 +298,24 @@ Harrington & Co Property Management` : ''
                     </span>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 3 }}>
+                <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                  {l.portfolioStatus === 'attention' && <span className="badge badge-amber" style={{ fontSize: 10 }}>Attention</span>}
+                  {l.portfolioStatus === 'archived' && <span className="badge badge-slate" style={{ fontSize: 10 }}>Archived</span>}
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} size={11} fill={i < l.rating ? '#f59e0b' : 'none'} color={i < l.rating ? '#f59e0b' : '#e2e8f0'} />
+                    <Star key={i} size={11} fill={i < (l.rating||0) ? '#f59e0b' : 'none'} color={i < (l.rating||0) ? '#f59e0b' : '#e2e8f0'} />
                   ))}
                 </div>
+              </div>
+              {/* Quick actions on card */}
+              <div style={{ display: 'flex', gap: 6, padding: '8px 0 0', borderTop: '1px solid #f8fafc', marginTop: 4 }}>
+                <button className="btn-primary" style={{ flex: 2, justifyContent: 'center', fontSize: 12 }}
+                  onClick={e => { e.stopPropagation(); navigate(`/landlords/${l.id}`) }}>
+                  <Eye size={11} /> View Profile
+                </button>
+                <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+                  onClick={e => { e.stopPropagation(); setSelected(l) }}>
+                  Details
+                </button>
               </div>
             </div>
           ))}
@@ -456,6 +476,17 @@ Harrington & Co Property Management` : ''
             </div>
           </div>
         </div>
+      )}
+
+      {/* Add Landlord modal */}
+      {showAddLandlord && (
+        <AddEditLandlordModal
+          onSave={(newId) => {
+            doRefresh()
+            setShowAddLandlord(false)
+          }}
+          onClose={() => setShowAddLandlord(false)}
+        />
       )}
     </div>
   )

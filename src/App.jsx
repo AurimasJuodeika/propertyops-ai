@@ -12,6 +12,7 @@ import Properties from './pages/Properties'
 import PropertyDetail from './pages/PropertyDetail'
 import Tenancies from './pages/Tenancies'
 import Landlords from './pages/Landlords'
+import LandlordProfile from './pages/LandlordProfile'
 import Tenants from './pages/Tenants'
 import Inspections from './pages/Inspections'
 import Compliance from './pages/Compliance'
@@ -112,6 +113,7 @@ function AppRoutes() {
           <Route path="/properties/:id"         element={<PageWrapper><PropertyDetail /></PageWrapper>} />
           <Route path="/tenancies"              element={<PageWrapper><Tenancies /></PageWrapper>} />
           <Route path="/landlords"              element={<PageWrapper><Landlords /></PageWrapper>} />
+          <Route path="/landlords/:id"          element={<PageWrapper><LandlordProfile /></PageWrapper>} />
           <Route path="/tenants"                element={<PageWrapper><Tenants /></PageWrapper>} />
           <Route path="/inspections"            element={<PageWrapper><Inspections /></PageWrapper>} />
           <Route path="/compliance"             element={<PageWrapper><Compliance /></PageWrapper>} />
