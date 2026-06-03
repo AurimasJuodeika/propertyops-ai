@@ -216,7 +216,6 @@ export default function PropertyDetail() {
   const [rescheduleId, setRescheduleId] = useState(null)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [showAssignTenant, setShowAssignTenant] = useState(false)
-  const [tenantAssignments, setTenantAssignments] = useState(getTenantAssignments ? getTenantAssignments() : {})
   const [bookingCert, setBookingCert]   = useState(null)
   const [bookingEmail, setBookingEmail] = useState('')
   const [bookingSending, setBookingSending] = useState(false)
@@ -234,12 +233,15 @@ export default function PropertyDetail() {
     </div>
   )
 
-  const landlord    = getLandlordById(property.landlordId)
-  // Tenant: check assignment override first, then property's default tenantId, then custom tenants
-  const assignedTenantId = getAssignedTenantId(property.id) || property.tenantId
-  const allTenants  = [...TENANTS, ...getCustomTenants()]
-  const tenant      = allTenants.find(t => t.id === assignedTenantId) || null
-  const tenancy     = getTenancyByPropertyId(property.id)
+  const landlord = getLandlordById(property.landlordId)
+
+  // Tenant in state so it re-renders immediately after assign/create
+  const [tenant, setTenant] = useState(() => {
+    const assignedId = getAssignedTenantId(property.id) || property.tenantId
+    return [...TENANTS, ...getCustomTenants()].find(t => t.id === assignedId) || null
+  })
+
+  const tenancy = getTenancyByPropertyId(property.id)
   const jobs        = MAINTENANCE_JOBS.filter(j => j.propertyId === property.id)
   const inspections = INSPECTIONS.filter(i => i.propertyId === property.id)
   const compStatus  = getComplianceStatus(property)
@@ -609,7 +611,7 @@ export default function PropertyDetail() {
                   property={property}
                   currentTenant={tenant}
                   onAssign={(t) => {
-                    setTenantAssignments(getTenantAssignments())
+                    setTenant(t)              // update tenant in state immediately
                     setShowAssignTenant(false)
                   }}
                   onClose={() => setShowAssignTenant(false)}
