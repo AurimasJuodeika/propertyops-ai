@@ -102,7 +102,10 @@ function TenancyRow({ tenancy, onPaymentUpdate }) {
         {/* Tenant + property */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
-            <p style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{tenant?.name || 'Unknown tenant'}</p>
+            <button onClick={() => tenant?.id && navigate(`/tenants/${tenant.id}`)}
+              style={{ fontWeight: 700, fontSize: 14, color: tenant?.id ? '#10b981' : '#0f172a', background: 'none', border: 'none', cursor: tenant?.id ? 'pointer' : 'default', fontFamily: 'inherit', padding: 0 }}>
+              {tenant?.name || 'Unknown tenant'}
+            </button>
             <span className={`badge ${STATUS_CONFIG[tenancy.status]?.class || 'badge-slate'}`}>
               {STATUS_CONFIG[tenancy.status]?.label || tenancy.status}
             </span>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Wrench, AlertTriangle, CheckCircle, Clock, Plus, Zap, ChevronRight, User, Calendar, PoundSterling, Mail, Send, ExternalLink } from 'lucide-react'
 import { MAINTENANCE_JOBS, getPropertyById, getContractorById, getLandlordById, getTenantById, MAINTENANCE_BY_MONTH, getJobNotes, addJobNote } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -22,6 +23,7 @@ const STATUS_CONFIG = {
 }
 
 export default function Maintenance() {
+  const navigate = useNavigate()
   const [priorityFilter, setPriorityFilter] = useState('All')
   const [statusFilter, setStatusFilter]     = useState('All')
   const [expandedJob, setExpandedJob]       = useState(null)
@@ -297,7 +299,7 @@ export default function Maintenance() {
                   </div>
                   <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11.5, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <User size={11} />{job.tenantName}
+                      <User size={11} />{job.tenantName || '—'}
                     </span>
                     <span style={{ fontSize: 11.5, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
                       📍 {property?.address}, {property?.postcode}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft, User, Building2, Users, Wrench, FileText, MessageSquare,
   Mail, Phone, Edit2, Plus, Archive, RotateCcw, CheckCircle,
@@ -10,9 +11,13 @@ import {
   getTenantById, getTenantProperty, getTenantTenancies, getActiveTenancy,
   getTenantMaintenance, getTenantStats, getTenantActivityLog, addTenantActivity,
   addTenantNote, archiveTenant, unarchiveTenant, getArchivedTenantIds,
-  getDemoPaymentHistory, TENANT_ACTIVITY_ICONS,
+  TENANT_ACTIVITY_ICONS,
 } from '../lib/tenantStore'
 import { getLandlordById } from '../lib/landlordStore'
+import {
+  getOrCreateRentStatus, recordRentReceivedExternally, updateRentStatus,
+  addRentNote, recordReminderSent, getStatusConfig, RENT_STATUSES,
+} from '../lib/rentStatusStore'
 import { getEffectiveRent } from '../lib/propertyOverrides'
 import AddEditTenantModal from '../components/AddEditTenantModal'
 import RenewalModal from '../components/RenewalModal'
@@ -67,6 +72,12 @@ export default function TenantProfile() {
   const [toast, setToast]               = useState('')
   const [emailSending, setEmailSending] = useState(false)
   const [emailSent, setEmailSent]       = useState(false)
+  const [rentStatus, setRentStatus]     = useState(null)
+  const [showRecordRent, setShowRecordRent] = useState(false)
+  const [showUpdateStatus, setShowUpdateStatus] = useState(false)
+  const [rentNoteInput, setRentNoteInput]  = useState('')
+  const [recordForm, setRecordForm] = useState({ amount: '', dateReceived: new Date().toISOString().split('T')[0], method: 'Bank transfer', reference: '', notes: '' })
+  const [updateForm, setUpdateForm] = useState({ status: '', arrearsAmount: '', note: '' })
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -103,7 +114,19 @@ export default function TenantProfile() {
   const stats         = getTenantStats(id)
   const landlord      = property ? getLandlordById(property.landlordId) : null
   const isArchived    = getArchivedTenantIds().includes(id)
-  const payments      = getDemoPaymentHistory(activeTenancy)
+  // Load rent status from store
+  useEffect(() => {
+    if (!id) return
+    const rs = getOrCreateRentStatus(id, activeTenancy?.id, property?.id)
+    setRentStatus(rs)
+    if (rs) setUpdateForm(f => ({ ...f, status: rs.currentStatus, arrearsAmount: rs.arrearsAmount || '' }))
+  }, [id, activeTenancy?.id, property?.id])
+
+  const getRentStatusCtx = () => ({
+    tenantId: id, tenancyId: activeTenancy?.id, propertyId: property?.id,
+    landlordId: landlord?.id, monthlyRent: activeTenancy?.monthlyRent || stats.monthlyRent,
+    rentDueDay: activeTenancy?.rentDueDay || 1,
+  })
 
   const statusColor = { active: '#10b981', arrears: '#dc2626', ending_soon: '#d97706', archived: '#64748b' }
   const statusLabel = { active: 'Active', arrears: 'In Arrears', ending_soon: 'Ending Soon', archived: 'Archived' }
@@ -150,8 +173,10 @@ export default function TenantProfile() {
     if (!tenant.email) { showToast('No email address — reminder not sent'); return }
     const prop = property
     try {
-      await sendEmail({ to: tenant.email, subject: `Rent Payment Reminder — ${prop?.address || 'Your Property'}`, message: EMAIL_TEMPLATES.rent_reminder.body(tenant, prop) })
-      const entry = addTenantActivity(id, { type: 'payment', text: 'Rent reminder sent by email' })
+      await sendEmail({ to: tenant.email, subject: `Rent Reminder — ${prop?.address || 'Your Property'}`, message: `Dear ${tenant.name},\n\nThis is a reminder that rent is due for ${prop?.address || 'your property'}.\n\nPlease arrange payment using the usual rent payment method agreed with the agency.\n\nIf you have already arranged payment, please disregard this message.\n\nKind regards,\nHarrington & Co\n020 7123 4567` })
+      const updated = recordReminderSent(rentStatus?.id || '', getRentStatusCtx())
+      setRentStatus(updated || rentStatus)
+      const entry = addTenantActivity(id, { type: 'payment', text: 'Rent reminder sent — tenant asked to arrange payment through usual method' })
       setActivityLog(prev => [entry, ...prev])
       showToast('Rent reminder sent')
     } catch (e) {
@@ -227,7 +252,7 @@ export default function TenantProfile() {
         <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', paddingLeft: 4, overflowX: 'auto' }}>
           <TabBtn label="Overview"   active={tab==='overview'}   onClick={() => setTab('overview')} />
           <TabBtn label="Tenancy"    active={tab==='tenancy'}    onClick={() => setTab('tenancy')} />
-          <TabBtn label="Payments"   active={tab==='payments'}   onClick={() => setTab('payments')}   badge={stats.arrears > 0 ? '!' : null} />
+          <TabBtn label="Rent Status" active={tab==='payments'}  onClick={() => setTab('payments')}   badge={stats.arrears > 0 ? '!' : null} />
           <TabBtn label="Documents"  active={tab==='documents'}  onClick={() => setTab('documents')} />
           <TabBtn label="Maintenance" active={tab==='maintenance'} onClick={() => setTab('maintenance')} badge={stats.openMaintenance || null} />
           <TabBtn label="Activity"   active={tab==='activity'}   onClick={() => setTab('activity')}   badge={activityLog.length || null} />
@@ -403,63 +428,209 @@ export default function TenantProfile() {
           {/* ── PAYMENTS ── */}
           {tab === 'payments' && (
             <div>
-              <div style={{ padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, marginBottom: 18 }}>
-                <p style={{ fontSize: 12.5, color: '#92400e' }}>⚠ Demo payment view — not connected to live bank payments. Record payments via the Tenancies page.</p>
+              {/* Operational tracking notice */}
+              <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 16, display: 'flex', gap: 8 }}>
+                <CheckCircle size={15} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ fontSize: 12.5, color: '#065f46' }}>
+                  <strong>Operational rent tracking only.</strong> No payments are processed in PropertyOps AI. Use this tab to record rent status, log when rent is received externally, and send reminders.
+                </p>
               </div>
 
-              {/* Summary */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 20 }}>
-                {[
-                  { label: 'Monthly Rent', value: `£${(stats.monthlyRent || 0).toLocaleString()}`, color: '#6366f1' },
-                  { label: 'Arrears', value: stats.arrears > 0 ? `£${stats.arrears.toLocaleString()}` : 'None', color: stats.arrears > 0 ? '#dc2626' : '#10b981' },
-                  { label: 'Deposit', value: `£${(activeTenancy?.depositAmount || 0).toLocaleString()}`, color: '#0284c7' },
-                ].map(s => (
-                  <div key={s.label} style={{ background: '#f8fafc', borderRadius: 9, padding: '12px 14px', textAlign: 'center' }}>
-                    <p style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</p>
-                    <p style={{ fontSize: 11.5, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>{s.label}</p>
+              {/* Status summary */}
+              {(() => {
+                const sc = rentStatus ? getStatusConfig(rentStatus.currentStatus) : getStatusConfig('up_to_date')
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
+                    {[
+                      { label: 'Monthly Rent', value: `£${(activeTenancy?.monthlyRent || stats.monthlyRent || 0).toLocaleString()}`, color: '#6366f1' },
+                      { label: 'Rent Due', value: `${activeTenancy?.rentDueDay || 1}${[,'st','nd','rd'][activeTenancy?.rentDueDay]||'th'} of month`, color: '#64748b' },
+                      { label: 'Current Status', value: <span className={`badge ${sc.badge}`}>{sc.label}</span>, color: sc.color },
+                      { label: 'Arrears', value: rentStatus?.arrearsAmount > 0 ? `£${rentStatus.arrearsAmount.toLocaleString()}` : stats.arrears > 0 ? `£${stats.arrears.toLocaleString()}` : 'None', color: (rentStatus?.arrearsAmount || stats.arrears || 0) > 0 ? '#dc2626' : '#10b981' },
+                    ].map(s => (
+                      <div key={s.label} style={{ background: '#f8fafc', borderRadius: 9, padding: '12px 14px', textAlign: 'center' }}>
+                        <p style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</p>
+                        <p style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginTop: 3 }}>{s.label}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )
+              })()}
 
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 13 }} onClick={handleRentReminder}>
+              {/* Last recorded */}
+              {rentStatus?.lastRecordedReceivedDate && (
+                <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 16, fontSize: 12.5, color: '#065f46' }}>
+                  ✓ Last recorded externally: <strong>£{(rentStatus.lastRecordedAmount||0).toLocaleString()}</strong> on {rentStatus.lastRecordedReceivedDate} via {rentStatus.externalMethod || '—'}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                <button className="btn-primary" style={{ justifyContent: 'center', fontSize: 13 }} onClick={() => setShowRecordRent(true)}>
+                  <CheckCircle size={13} /> Record Rent Received Externally
+                </button>
+                <button className="btn-secondary" style={{ justifyContent: 'center', fontSize: 13 }} onClick={() => setShowUpdateStatus(true)}>
+                  <Edit2 size={13} /> Update Rent Status
+                </button>
+                <button className="btn-secondary" style={{ justifyContent: 'center', fontSize: 13 }} onClick={handleRentReminder}>
                   <Send size={13} /> Send Rent Reminder
                 </button>
-                {stats.arrears > 0 && (
-                  <button className="btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 13, background: '#dc2626', boxShadow: 'none' }} onClick={() => navigate('/rent-arrears')}>
-                    <AlertTriangle size={13} /> View Arrears Case
+                {(rentStatus?.arrearsAmount || stats.arrears || 0) > 0 && (
+                  <button className="btn-secondary" style={{ justifyContent: 'center', fontSize: 13, color: '#dc2626', borderColor: '#fecaca' }} onClick={() => navigate('/rent-arrears')}>
+                    <AlertTriangle size={13} /> View Arrears
                   </button>
                 )}
               </div>
 
-              {/* Add payment note */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                <input value={paymentNote} onChange={e => setPaymentNote(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handlePaymentNote()}
-                  placeholder="Add payment note… (Enter)"
+              {/* Add rent note */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+                <input value={rentNoteInput} onChange={e => setRentNoteInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && rentNoteInput.trim()) { const ctx = getRentStatusCtx(); const updated = addRentNote(rentStatus?.id || '', ctx, rentNoteInput.trim()); setRentStatus(updated || rentStatus); const entry = addTenantActivity(id, { type: 'payment', text: `Rent note: ${rentNoteInput.trim()}` }); setActivityLog(prev => [entry, ...prev]); setRentNoteInput(''); showToast('Rent note added') } }}
+                  placeholder="Add rent note… (Enter)"
                   style={{ flex: 1, border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#0f172a' }} />
-                <button className="btn-secondary" style={{ fontSize: 12, flexShrink: 0 }} onClick={handlePaymentNote}>Add Note</button>
+                <button className="btn-secondary" style={{ fontSize: 12, flexShrink: 0 }} onClick={() => { if (rentNoteInput.trim()) { const ctx = getRentStatusCtx(); const updated = addRentNote(rentStatus?.id || '', ctx, rentNoteInput.trim()); setRentStatus(updated || rentStatus); const entry = addTenantActivity(id, { type: 'payment', text: `Rent note: ${rentNoteInput.trim()}` }); setActivityLog(prev => [entry, ...prev]); setRentNoteInput(''); showToast('Rent note added') } }}>
+                  Add Note
+                </button>
               </div>
 
-              {/* Payment history */}
-              <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 10 }}>Payment History (Demo)</p>
-              {payments.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>No payment history available. Record payments via the Tenancies page.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {payments.map((p, i) => {
-                    const cfg = p.status === 'paid' ? { bg: '#f0fdf4', color: '#16a34a', label: '✓ Paid' } : { bg: '#fef2f2', color: '#dc2626', label: '✗ Missed' }
-                    return (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, background: cfg.bg }}>
-                        <p style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: '#334155' }}>{p.month}</p>
-                        <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>£{p.amount.toLocaleString()}</p>
-                        <span style={{ fontSize: 11.5, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: `${cfg.color}20`, color: cfg.color }}>{cfg.label}</span>
-                        {p.date && <p style={{ fontSize: 11, color: '#94a3b8' }}>{p.date}</p>}
-                      </div>
-                    )
-                  })}
+              {/* Note history */}
+              {rentStatus?.noteHistory?.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 10 }}>Rent Status History</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {rentStatus.noteHistory.slice(0, 8).map((n, i) => {
+                      const typeIcon = n.type === 'received' ? '💷' : n.type === 'reminder' ? '📧' : n.type === 'status' ? '📋' : '💬'
+                      return (
+                        <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                          <span style={{ fontSize: 15, flexShrink: 0 }}>{typeIcon}</span>
+                          <div>
+                            <p style={{ fontSize: 12.5, color: '#334155' }}>{n.text}</p>
+                            <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{n.author || 'Staff'} · {n.date}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
+              )}
+
+              {/* Record Rent Received modal */}
+              {showRecordRent && createPortal(
+                <>
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', zIndex: 79 }} onClick={() => setShowRecordRent(false)} />
+                  <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 80, background: 'white', borderRadius: 16, width: 460, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.25)' }}
+                    onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                      <div>
+                        <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>Record Rent Received Externally</h2>
+                        <p style={{ fontSize: 12, color: '#64748b', marginTop: 3, fontStyle: 'italic' }}>Operational record only — no payment is processed in PropertyOps AI</p>
+                      </div>
+                      <button onClick={() => setShowRecordRent(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={17} color="#94a3b8" /></button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 4 }}>Amount Received (£) *</label>
+                          <input type="number" value={recordForm.amount} onChange={e => setRecordForm(f => ({...f, amount: e.target.value}))}
+                            placeholder={activeTenancy?.monthlyRent || ''}
+                            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 16, fontWeight: 700, textAlign: 'center', outline: 'none', fontFamily: 'inherit', color: '#0f172a', boxSizing: 'border-box' }}
+                            onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 4 }}>Date Received *</label>
+                          <input type="date" value={recordForm.dateReceived} onChange={e => setRecordForm(f => ({...f, dateReceived: e.target.value}))}
+                            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#0f172a', boxSizing: 'border-box' }}
+                            onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 4 }}>External Payment Method</label>
+                        <select value={recordForm.method} onChange={e => setRecordForm(f => ({...f, method: e.target.value}))}
+                          style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#0f172a', cursor: 'pointer' }}>
+                          {['Bank transfer','Standing order','Cash','Existing agency system','Other'].map(m => <option key={m}>{m}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 4 }}>Reference (optional)</label>
+                        <input value={recordForm.reference} onChange={e => setRecordForm(f => ({...f, reference: e.target.value}))} placeholder="Bank reference, SO reference…"
+                          style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#0f172a', boxSizing: 'border-box' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 4 }}>Notes</label>
+                        <input value={recordForm.notes} onChange={e => setRecordForm(f => ({...f, notes: e.target.value}))} placeholder="Any relevant notes…"
+                          style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#0f172a', boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                        <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowRecordRent(false)}>Cancel</button>
+                        <button className="btn-primary" style={{ flex: 2, justifyContent: 'center' }} disabled={!recordForm.amount || !recordForm.dateReceived}
+                          onClick={() => {
+                            const ctx = getRentStatusCtx()
+                            const updated = recordRentReceivedExternally(rentStatus?.id || '', ctx, recordForm)
+                            setRentStatus(updated)
+                            const entry = addTenantActivity(id, { type: 'payment', text: `Rent recorded as received externally: £${Number(recordForm.amount).toLocaleString()} via ${recordForm.method}` })
+                            setActivityLog(prev => [entry, ...prev])
+                            setShowRecordRent(false)
+                            showToast('Rent recorded as received externally — no payment was processed in PropertyOps AI')
+                          }}>
+                          <CheckCircle size={14} /> Record as Received Externally
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>,
+                document.body
+              )}
+
+              {/* Update Status modal */}
+              {showUpdateStatus && createPortal(
+                <>
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', zIndex: 79 }} onClick={() => setShowUpdateStatus(false)} />
+                  <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 80, background: 'white', borderRadius: 16, width: 420, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.25)' }}
+                    onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                      <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>Update Rent Status</h2>
+                      <button onClick={() => setShowUpdateStatus(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={17} color="#94a3b8" /></button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {RENT_STATUSES.map(s => (
+                          <button key={s.value} onClick={() => setUpdateForm(f => ({ ...f, status: s.value }))}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 9, border: updateForm.status === s.value ? `2px solid ${s.color}` : '1.5px solid #e2e8f0', background: updateForm.status === s.value ? s.bg : 'white', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                            <span style={{ fontSize: 13.5, fontWeight: 600, color: '#0f172a', flex: 1 }}>{s.label}</span>
+                            {updateForm.status === s.value && <CheckCircle size={15} color={s.color} />}
+                          </button>
+                        ))}
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 4 }}>Arrears Amount (£)</label>
+                        <input type="number" value={updateForm.arrearsAmount} onChange={e => setUpdateForm(f => ({...f, arrearsAmount: e.target.value}))} placeholder="0"
+                          style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#0f172a', boxSizing: 'border-box' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 4 }}>Note (optional)</label>
+                        <input value={updateForm.note} onChange={e => setUpdateForm(f => ({...f, note: e.target.value}))} placeholder="Reason for status change…"
+                          style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#0f172a', boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowUpdateStatus(false)}>Cancel</button>
+                        <button className="btn-primary" style={{ flex: 2, justifyContent: 'center' }} disabled={!updateForm.status}
+                          onClick={() => {
+                            const ctx = getRentStatusCtx()
+                            const updated = updateRentStatus(rentStatus?.id || '', ctx, updateForm)
+                            setRentStatus(updated)
+                            const sc = getStatusConfig(updateForm.status)
+                            const entry = addTenantActivity(id, { type: 'payment', text: `Rent status updated to: ${sc.label}${updateForm.note ? ` — ${updateForm.note}` : ''}` })
+                            setActivityLog(prev => [entry, ...prev])
+                            setShowUpdateStatus(false)
+                            showToast(`Rent status updated to: ${sc.label}`)
+                          }}>
+                          Save Status
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>,
+                document.body
               )}
             </div>
           )}

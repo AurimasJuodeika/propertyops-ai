@@ -656,7 +656,12 @@ export default function PropertyDetail() {
                     <div style={{ width:36, height:36, borderRadius:9, background:'linear-gradient(135deg,#6366f1,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight:800, fontSize:12 }}>
                       {landlord?.name?.split(' ').map(w=>w[0]).join('').slice(0,2)}
                     </div>
-                    <div><p style={{ fontWeight:700, color:'#0f172a', fontSize:14 }}>{landlord?.name}</p></div>
+                    <div>
+                      <button onClick={() => landlord?.id && navigate(`/landlords/${landlord.id}`)}
+                        style={{ fontWeight:700, color: landlord?.id ? '#10b981' : '#0f172a', fontSize:14, background:'none', border:'none', cursor: landlord?.id ? 'pointer' : 'default', fontFamily:'inherit', padding:0 }}>
+                        {landlord?.name}
+                      </button>
+                    </div>
                   </div>
                   <a href={`mailto:${landlord?.email}`} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12.5, color:'#334155', textDecoration:'none', marginBottom:5 }}><Mail size={12} color="#94a3b8" />{landlord?.email}</a>
                   <a href={`tel:${landlord?.phone}`} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12.5, color:'#334155', textDecoration:'none' }}><Phone size={12} color="#94a3b8" />{landlord?.phone}</a>
@@ -674,7 +679,12 @@ export default function PropertyDetail() {
                       <div style={{ width:36, height:36, borderRadius:9, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight:800, fontSize:12 }}>
                         {tenant.name.split(' ').map(w=>w[0]).join('').slice(0,2)}
                       </div>
-                      <div><p style={{ fontWeight:700, color:'#0f172a', fontSize:14 }}>{tenant.name}</p></div>
+                      <div>
+                        <button onClick={() => tenant?.id && navigate(`/tenants/${tenant.id}`)}
+                          style={{ fontWeight:700, color: tenant?.id ? '#10b981' : '#0f172a', fontSize:14, background:'none', border:'none', cursor: tenant?.id ? 'pointer' : 'default', fontFamily:'inherit', padding:0 }}>
+                          {tenant.name}
+                        </button>
+                      </div>
                     </div>
                     <a href={`mailto:${tenant.email}`} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12.5, color:'#334155', textDecoration:'none', marginBottom:5 }}><Mail size={12} color="#94a3b8" />{tenant.email}</a>
                     <a href={`tel:${tenant.phone}`} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12.5, color:'#334155', textDecoration:'none' }}><Phone size={12} color="#94a3b8" />{tenant.phone}</a>

@@ -20,6 +20,7 @@ import {
 } from '../data/mockData'
 import { getAllStoredTasks } from '../lib/taskStore'
 import { getNewProperties, getDeletedPropertyIds } from '../lib/propertyOverrides'
+import { getArrearsSummary } from '../lib/rentStatusStore'
 import { useAuth } from '../context/AuthContext'
 
 // ─── Role config ────────────────────────────────────────────────────────────
@@ -218,6 +219,17 @@ function OwnerDashboard({ data }) {
   const emergencyJobs = openJobs.filter(j => j.priority === 'emergency')
   const overdueTasksCount = TASKS.filter(t => t.status === 'overdue').length
 
+  // Pull rent status issues into priorities
+  const { overdue: overdueRent, escalated: escalatedRent } = (() => {
+    try { const s = getArrearsSummary(); return { overdue: s.overdue || [], escalated: [] } } catch { return { overdue: [], escalated: [] } }
+  })()
+  const rentPriorities = overdueRent.slice(0, 2).map(r => ({
+    type: 'arrears', severity: r.currentStatus === 'escalated' ? 'critical' : 'warning',
+    title: `Rent ${r.currentStatus === 'escalated' ? 'escalated' : 'overdue'}${r.arrearsAmount > 0 ? ` — £${r.arrearsAmount.toLocaleString()}` : ''}`,
+    sub: r.propertyAddress || r.propertyId || 'Unknown property',
+    link: '/rent-arrears',
+  }))
+
   // Pull overdue/critical stored tasks into priorities
   const storedTaskPriorities = getAllStoredTasks()
     .filter(t => !['completed','cancelled'].includes(t.status) &&
@@ -229,8 +241,9 @@ function OwnerDashboard({ data }) {
       link: '/tasks'
     }))
 
-  // Today's priorities — specific actionable items (include stored tasks)
+  // Today's priorities — include rent status issues + stored tasks
   const todayPriorities = [
+    ...rentPriorities,
     ...storedTaskPriorities,
     ...openJobs.filter(j => j.priority === 'emergency' || j.priority === 'urgent').slice(0, 2).map(j => ({
       type: 'maintenance', severity: j.priority === 'emergency' ? 'critical' : 'warning',

@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { PoundSterling, AlertTriangle, TrendingDown, Clock, Zap, Mail, Phone, FileText, CheckCircle } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { PoundSterling, AlertTriangle, TrendingDown, Clock, Zap, Mail, Phone, FileText, CheckCircle, ExternalLink } from 'lucide-react'
 import { TENANCIES, getPropertyById, getTenantById, RENT_COLLECTION_CHART } from '../data/mockData'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { sendArrearsLetter } from '../lib/email'
 import { generateArrearsLetter, isAIConfigured } from '../lib/ai'
+import { getArrearsSummary, getStatusConfig, RENT_STATUSES } from '../lib/rentStatusStore'
+import { getAllTenants } from '../lib/tenantStore'
 
 const ARREARS_STAGES = {
   stage1: { label: 'Stage 1 — Reminder', days: '7-14', color: '#f59e0b', bg: '#fffbeb' },
@@ -18,6 +21,7 @@ function getArrearStage(months) {
 }
 
 export default function RentArrears() {
+  const navigate = useNavigate()
   const [selectedTenancy, setSelectedTenancy] = useState(null)
   const [showAILetter, setShowAILetter]         = useState(false)
   const [sending, setSending]   = useState(false)
@@ -196,11 +200,17 @@ Harrington & Co Property Management`
                 return (
                   <tr key={t.id} onClick={() => setSelectedTenancy(selectedTenancy?.id === t.id ? null : t)} style={{ cursor: 'pointer' }}>
                     <td>
-                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{t.tenant?.name}</div>
+                      <button onClick={() => t.tenant?.id && navigate(`/tenants/${t.tenant.id}`)}
+                        style={{ fontWeight: 600, color: t.tenant?.id ? '#10b981' : '#1e293b', fontSize: 13, background: 'none', border: 'none', cursor: t.tenant?.id ? 'pointer' : 'default', fontFamily: 'inherit', padding: 0, textAlign: 'left' }}>
+                        {t.tenant?.name || '—'}
+                      </button>
                       <div style={{ fontSize: 11, color: '#94a3b8' }}>{t.tenant?.email}</div>
                     </td>
                     <td>
-                      <div style={{ fontSize: 12.5, color: '#334155' }}>{t.property?.address}</div>
+                      <button onClick={() => t.property?.id && navigate(`/properties/${t.property.id}`)}
+                        style={{ fontSize: 12.5, color: t.property?.id ? '#10b981' : '#334155', fontWeight: t.property?.id ? 600 : 400, background: 'none', border: 'none', cursor: t.property?.id ? 'pointer' : 'default', fontFamily: 'inherit', padding: 0, textAlign: 'left', display: 'block' }}>
+                        {t.property?.address || '—'}
+                      </button>
                       <div style={{ fontSize: 11, color: '#94a3b8' }}>{t.property?.postcode}</div>
                     </td>
                     <td style={{ fontWeight: 600 }}>£{t.monthlyRent.toLocaleString()}</td>
