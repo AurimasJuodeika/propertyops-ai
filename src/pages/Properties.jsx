@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Building2, Search, ChevronRight, Users, ShieldCheck, AlertTriangle, Home, Plus, MapPin, BedDouble, Edit2, X, Save } from 'lucide-react'
 import { PROPERTIES, getLandlordById, getTenantById, getComplianceStatus, LANDLORDS, TENANTS } from '../data/mockData'
 import { getEffectiveRent, getEffectiveProperty, getPropertyOverrides, getNewProperties, addNewProperty, getDeletedPropertyIds, removeNewProperty, getAssignedTenantId, getCustomTenants } from '../lib/propertyOverrides'
@@ -234,15 +234,26 @@ function getAddPropertyPosition(rect) {
 
 export default function Properties() {
   const navigate = useNavigate()
+  const [searchParams]                  = useSearchParams()
   const [search, setSearch]             = useState('')
   const [branchFilter, setBranchFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [editingRent, setEditingRent]       = useState(null)
   const [editingProperty, setEditingProperty] = useState(null)
   const [rentOverrides, setRentOverrides]   = useState(getPropertyOverrides())
-  const [showAdd, setShowAdd]               = useState(null)  // anchorRect for old modal (kept for compat)
+  const [showAdd, setShowAdd]               = useState(null)
   const [showWizard, setShowWizard]         = useState(false)
+  const [wizardLandlordId, setWizardLandlordId] = useState(null)
   const [newProperties, setNewProperties]   = useState(getNewProperties())
+
+  // Auto-open wizard if navigated with ?new=true&landlordId=xxx
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      const lid = searchParams.get('landlordId')
+      setWizardLandlordId(lid || null)
+      setShowWizard(true)
+    }
+  }, [])
   const [deletedIds, setDeletedIds]         = useState(getDeletedPropertyIds())
 
   const allProperties = [...PROPERTIES, ...newProperties].filter(p => !deletedIds.includes(p.id))
@@ -467,12 +478,14 @@ export default function Properties() {
       {/* Property Onboarding Wizard */}
       {showWizard && (
         <PropertyOnboardingWizard
+          defaultLandlordId={wizardLandlordId}
           onComplete={(newProp) => {
             setNewProperties(getNewProperties())
             setShowWizard(false)
+            setWizardLandlordId(null)
             navigate(`/properties/${newProp.id}`)
           }}
-          onClose={() => setShowWizard(false)}
+          onClose={() => { setShowWizard(false); setWizardLandlordId(null) }}
         />
       )}
 

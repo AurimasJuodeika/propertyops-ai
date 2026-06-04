@@ -1,329 +1,185 @@
-import { useState, useEffect } from 'react'
-import { User, CheckCircle, AlertTriangle, Clock, Plus, ChevronRight, Mail, Phone, Shield, X, Save, Edit2, Trash2 } from 'lucide-react'
-import { TENANTS, getPropertyById, getTenancyByPropertyId } from '../data/mockData'
-import { supabase, isConfigured } from '../lib/supabase'
-import { getCustomTenants, getAssignedTenantId } from '../lib/propertyOverrides'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { User, CheckCircle, AlertTriangle, Clock, Plus, ChevronRight, Mail, Phone, X, Eye, Archive, Edit2, MessageSquare } from 'lucide-react'
+import { getAllTenants, getTenantProperty, getActiveTenancy, getTenantStats, getTenantStatus, archiveTenant, unarchiveTenant, getArchivedTenantIds, addTenantNote } from '../lib/tenantStore'
+import AddEditTenantModal from '../components/AddEditTenantModal'
 
-// ─── RTR Status config ────────────────────────────────────────────────────────
-const RTR_STATUSES = [
-  { value: 'verified',            label: '✓ Verified',            class: 'badge-green',  color: '#10b981', icon: CheckCircle,  desc: 'Documents checked and on file' },
-  { value: 'expiring_soon',       label: '⚠ Expiring Soon',       class: 'badge-amber',  color: '#d97706', icon: Clock,        desc: 'Re-check required within 60 days' },
-  { value: 'documents_requested', label: '📋 Docs Requested',     class: 'badge-blue',   color: '#2563eb', icon: Shield,       desc: 'Documents requested from tenant' },
-  { value: 'documents_received',  label: '📄 Docs Received',      class: 'badge-purple', color: '#7c3aed', icon: Shield,       desc: 'Documents received, pending check' },
-  { value: 'not_verified',        label: '⚠ Not Verified',        class: 'badge-red',    color: '#dc2626', icon: AlertTriangle, desc: 'No RTR check completed — action required' },
-]
-
-const RTR_KEY = 'propertyops_rtr_overrides'
-
-function getRTROverrides() {
-  try { return JSON.parse(localStorage.getItem(RTR_KEY) || '{}') } catch { return {} }
-}
-function setRTROverride(tenantId, data) {
-  const all = getRTROverrides()
-  all[tenantId] = data
-  localStorage.setItem(RTR_KEY, JSON.stringify(all))
+const STATUS_CONFIG = {
+  active:      { label: 'Active',       class: 'badge-green',  color: '#10b981' },
+  arrears:     { label: 'In Arrears',   class: 'badge-red',    color: '#dc2626' },
+  ending_soon: { label: 'Ending Soon',  class: 'badge-amber',  color: '#d97706' },
+  archived:    { label: 'Archived',     class: 'badge-slate',  color: '#64748b' },
 }
 
-function getRTRStatus(tenant, overrides = {}) {
-  const override = overrides[tenant.id]
-
-  // Use override if set
-  if (override) {
-    return {
-      ...override,
-      statusConfig: RTR_STATUSES.find(s => s.value === override.status) || RTR_STATUSES[4],
-    }
-  }
-
-  // Default from mock data
-  if (!tenant.rtRVerified) {
-    return { status: 'not_verified', expiry: null, statusConfig: RTR_STATUSES[4] }
-  }
-  if (!tenant.rtRExpiry) {
-    return { status: 'verified', expiry: null, statusConfig: RTR_STATUSES[0] }
-  }
-  const days = Math.round((new Date(tenant.rtRExpiry) - new Date()) / (1000 * 60 * 60 * 24))
-  if (days <= 60 && days > 0) {
-    return { status: 'expiring_soon', expiry: tenant.rtRExpiry, statusConfig: RTR_STATUSES[1] }
-  }
-  return { status: 'verified', expiry: tenant.rtRExpiry, statusConfig: RTR_STATUSES[0] }
+// ─── RTR status helper ────────────────────────────────────────────────────────
+function rtrBadge(t) {
+  if (!t.rtRVerified) return <span className="badge badge-red" style={{ fontSize: 10.5 }}>⚠ Not Verified</span>
+  if (!t.rtRExpiry)   return <span className="badge badge-green" style={{ fontSize: 10.5 }}>✓ Verified</span>
+  const days = Math.round((new Date(t.rtRExpiry) - new Date()) / (1000*60*60*24))
+  if (days <= 60)     return <span className="badge badge-amber" style={{ fontSize: 10.5 }}>⚠ Expiring {days}d</span>
+  return <span className="badge badge-green" style={{ fontSize: 10.5 }}>✓ Verified</span>
 }
 
-// ─── RTR Update Modal ─────────────────────────────────────────────────────────
-function RTRModal({ tenant, property, currentRTR, onSave, onClose }) {
-  const [status, setStatus]   = useState(currentRTR.status)
-  const [expiry, setExpiry]   = useState(currentRTR.expiry || '')
-  const [notes, setNotes]     = useState(currentRTR.notes || '')
-  const [saving, setSaving]   = useState(false)
-
-  const handleSave = async () => {
-    setSaving(true)
-    const data = { status, expiry: expiry || null, notes, updatedAt: new Date().toISOString() }
-    setRTROverride(tenant.id, data)
-
-    // Save to Supabase if configured
-    if (isConfigured) {
-      try {
-        await supabase.from('rtr_verifications').upsert({
-          tenant_id: tenant.id,
-          ...data,
-        })
-      } catch (e) { console.warn('Supabase RTR save failed:', e) }
-    }
-    onSave(tenant.id, data)
-    setSaving(false)
-    onClose()
-  }
-
-  const sc = RTR_STATUSES.find(s => s.value === status)
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-      onClick={onClose}>
-      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 480, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}
-        onClick={e => e.stopPropagation()}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Update Right to Rent</h2>
-            <p style={{ fontSize: 13, color: '#64748b' }}>{tenant.name} · {property?.address}</p>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-            <X size={18} color="#94a3b8" />
-          </button>
-        </div>
-
-        {/* Status picker */}
-        <div style={{ marginBottom: 18 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 10 }}>Verification Status</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {RTR_STATUSES.map(s => (
-              <button key={s.value} onClick={() => setStatus(s.value)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px',
-                  borderRadius: 10, border: status === s.value ? `2px solid ${s.color}` : '1.5px solid #e2e8f0',
-                  background: status === s.value ? `${s.color}10` : 'white',
-                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.15s',
-                }}>
-                <s.icon size={16} color={s.color} style={{ flexShrink: 0 }} />
-                <div>
-                  <p style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>{s.label}</p>
-                  <p style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 1 }}>{s.desc}</p>
-                </div>
-                {status === s.value && (
-                  <CheckCircle size={16} color={s.color} style={{ marginLeft: 'auto' }} />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Expiry date */}
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 6 }}>
-            Document / Visa Expiry Date <span style={{ color: '#cbd5e1', fontWeight: 400 }}>(optional)</span>
-          </label>
-          <input type="date" value={expiry} onChange={e => setExpiry(e.target.value)}
-            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 9, padding: '10px 12px', fontSize: 13.5, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: '#0f172a' }}
-            onFocus={e => e.target.style.borderColor = '#10b981'}
-            onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-        </div>
-
-        {/* Notes */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 6 }}>
-            Notes <span style={{ color: '#cbd5e1', fontWeight: 400 }}>(optional)</span>
-          </label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-            placeholder="e.g. Passport seen and copied, BRP card verified, share code confirmed…"
-            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 9, padding: '10px 12px', fontSize: 13.5, outline: 'none', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box', color: '#0f172a' }}
-            onFocus={e => e.target.style.borderColor = '#10b981'}
-            onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>
-            <Save size={14} /> {saving ? 'Saving…' : 'Save RTR Status'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
 export default function Tenants() {
+  const navigate = useNavigate()
   const [search, setSearch]         = useState('')
-  const [overrides, setOverrides]   = useState(getRTROverrides())
-  const [editing, setEditing]       = useState(null)
-  const [editingTenant, setEditingTenant] = useState(null) // for edit custom tenant
-  const [customTenants, setCustomTenants] = useState(getCustomTenants())
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [showAddTenant, setShowAddTenant] = useState(false)
+  const [editingTenant, setEditingTenant] = useState(null)
+  const [showArchived, setShowArchived]   = useState(false)
+  const [refresh, setRefresh]             = useState(0)
+  const [toast, setToast]                 = useState('')
 
-  // Merge mock + custom tenants
-  const allTenants = [...TENANTS, ...customTenants]
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
+  const doRefresh = () => setRefresh(r => r + 1)
 
-  // Helper to find property including new ones from localStorage
-  const resolveProperty = (propertyId) => {
-    if (!propertyId) return null
-    const mock = getPropertyById(propertyId)
-    if (mock) return mock
-    try { return JSON.parse(localStorage.getItem('propertyops_new_properties') || '[]').find(p => p.id === propertyId) || null } catch { return null }
-  }
+  const allTenants = getAllTenants({ includeArchived: showArchived })
+  const archived   = getArchivedTenantIds()
 
-  const enriched = allTenants.map(t => ({
-    ...t,
-    property: resolveProperty(t.propertyId),
-    tenancy:  getTenancyByPropertyId(t.propertyId),
-    rtr:      getRTRStatus(t, overrides),
-  })).filter(t => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || t.property?.address?.toLowerCase().includes(q)
+  const enriched = allTenants.map(t => {
+    const property  = getTenantProperty(t.id)
+    const tenancy   = getActiveTenancy(t.id)
+    const stats     = getTenantStats(t.id)
+    const status    = getTenantStatus(t.id)
+    return { ...t, property, tenancy, stats, status }
   })
 
-  const rtrIssues    = enriched.filter(t => t.rtr.status === 'not_verified').length
-  const expiringSoon = enriched.filter(t => t.rtr.status === 'expiring_soon').length
-  const docsRequested= enriched.filter(t => t.rtr.status === 'documents_requested' || t.rtr.status === 'documents_received').length
+  const filtered = enriched.filter(t => {
+    const q = search.toLowerCase()
+    const matchSearch = !q || t.name?.toLowerCase().includes(q) || t.email?.toLowerCase().includes(q) || t.property?.address?.toLowerCase().includes(q)
+    const matchStatus = statusFilter === 'all' || t.status === statusFilter
+    return matchSearch && matchStatus
+  })
 
-  const handleSave = (tenantId, data) => {
-    setOverrides(prev => ({ ...prev, [tenantId]: data }))
+  const counts = {
+    all:         enriched.length,
+    active:      enriched.filter(t => t.status === 'active').length,
+    arrears:     enriched.filter(t => t.status === 'arrears').length,
+    ending_soon: enriched.filter(t => t.status === 'ending_soon').length,
   }
+
+  const rtrIssues = enriched.filter(t => !t.rtRVerified).length
 
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h1 className="page-title">Tenants</h1>
-          <p className="page-subtitle">{TENANTS.length} active tenants · {rtrIssues} RTR not verified · {expiringSoon} expiring soon</p>
+          <p className="page-subtitle">{enriched.length} tenants · {rtrIssues > 0 ? `${rtrIssues} RTR issues · ` : ''}{counts.arrears > 0 ? `${counts.arrears} in arrears · ` : ''}{counts.ending_soon > 0 ? `${counts.ending_soon} ending soon` : ''}</p>
         </div>
-        <button className="btn-primary" onClick={() => setEditingTenant({ id:'ct_'+Date.now(), name:"", email:"", phone:"", nationality:"British", isCustom:true })}><Plus size={13} /> Add Tenant</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => { setShowArchived(v => !v); doRefresh() }}>
+            {showArchived ? 'Hide Archived' : 'Show Archived'}
+          </button>
+          <button className="btn-primary" onClick={() => setShowAddTenant(true)}><Plus size={13} /> Add Tenant</button>
+        </div>
       </div>
 
-      {/* RTR legend */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, padding: '10px 14px', background: 'white', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginRight: 4 }}>RTR Status:</span>
-        {RTR_STATUSES.map(s => (
-          <span key={s.value} className={`badge ${s.class}`} style={{ fontSize: 11 }}>{s.label}</span>
-        ))}
-        <span style={{ fontSize: 11.5, color: '#94a3b8', marginLeft: 'auto' }}>Click any RTR badge to update</span>
-      </div>
-
-      {/* Alerts */}
+      {/* RTR alert */}
       {rtrIssues > 0 && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, marginBottom: 16 }}>
-          <AlertTriangle size={16} color="#dc2626" style={{ flexShrink: 0 }} />
-          <p style={{ fontSize: 13, fontWeight: 600, color: '#991b1b' }}>
-            Right to Rent not verified for {rtrIssues} tenant{rtrIssues !== 1 ? 's' : ''} — civil penalty up to £10,000 per tenant. Click the badge to update.
-          </p>
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '11px 16px', display: 'flex', gap: 10, marginBottom: 16 }}>
+          <AlertTriangle size={15} color="#dc2626" />
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#991b1b' }}>Right to Rent not verified for {rtrIssues} tenant{rtrIssues !== 1 ? 's' : ''} — civil penalty risk up to £10,000 per tenant</p>
         </div>
       )}
-      {expiringSoon > 0 && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, marginBottom: 16 }}>
-          <Clock size={16} color="#d97706" style={{ flexShrink: 0 }} />
-          <p style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>
-            {expiringSoon} tenant RTR document{expiringSoon !== 1 ? 's' : ''} expiring within 60 days — re-check required.
-          </p>
-        </div>
-      )}
+
+      {/* Status filter */}
+      <div style={{ display: 'flex', gap: 7, marginBottom: 14, flexWrap: 'wrap' }}>
+        {[
+          { key: 'all',         label: `All (${counts.all})` },
+          { key: 'active',      label: `Active (${counts.active})` },
+          { key: 'arrears',     label: `In Arrears (${counts.arrears})` },
+          { key: 'ending_soon', label: `Ending Soon (${counts.ending_soon})` },
+        ].map(f => (
+          <button key={f.key} onClick={() => setStatusFilter(f.key)}
+            style={{ padding: '6px 13px', borderRadius: 20, border: statusFilter === f.key ? 'none' : '1px solid #e2e8f0', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, background: statusFilter === f.key ? '#0f172a' : 'white', color: statusFilter === f.key ? 'white' : '#64748b' }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       {/* Search */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, padding: '9px 14px', marginBottom: 16 }}>
         <User size={14} color="#94a3b8" />
         <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search tenants by name, email or address…"
+          placeholder="Search by name, email or property…"
           style={{ border: 'none', outline: 'none', fontSize: 13, color: '#334155', width: '100%', background: 'none' }} />
+        {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={14} color="#94a3b8" /></button>}
       </div>
 
-      {/* ── DESKTOP TABLE ── */}
+      {/* Tenant list */}
       <div className="card hide-mobile">
         <table className="data-table">
           <thead>
             <tr>
               <th>Tenant</th>
               <th>Property</th>
-              <th>Nationality</th>
-              <th>Right to Rent</th>
-              <th>RTR Expiry</th>
+              <th>Tenancy</th>
               <th>Monthly Rent</th>
               <th>Arrears</th>
-              <th></th>
+              <th>RTR</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {enriched.map(t => {
-              const { statusConfig, status, expiry, notes } = t.rtr
-              const Icon = statusConfig.icon
+            {filtered.map(t => {
+              const sc = STATUS_CONFIG[t.status] || STATUS_CONFIG.active
               return (
-                <tr key={t.id} style={{ cursor: 'pointer' }}>
+                <tr key={t.id}>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <User size={14} color="#10b981" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 8, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <User size={14} color="#6366f1" />
                       </div>
                       <div>
-                        <p style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{t.name}</p>
+                        <button onClick={() => navigate(`/tenants/${t.id}`)}
+                          style={{ fontWeight: 600, color: '#10b981', fontSize: 13.5, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0, textAlign: 'left' }}>
+                          {t.name}
+                        </button>
                         <p style={{ fontSize: 11, color: '#94a3b8' }}>{t.email}</p>
                       </div>
                     </div>
                   </td>
                   <td>
-                    <p style={{ fontSize: 12.5, color: '#334155' }}>{t.property?.address}</p>
-                    <p style={{ fontSize: 11, color: '#94a3b8' }}>{t.property?.postcode}</p>
+                    {t.property ? (
+                      <button onClick={() => navigate(`/properties/${t.property.id}`)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', padding: 0 }}>
+                        <p style={{ fontSize: 12.5, color: '#10b981', fontWeight: 600 }}>{t.property.address}</p>
+                        <p style={{ fontSize: 11, color: '#94a3b8' }}>{t.property.postcode}</p>
+                      </button>
+                    ) : <span style={{ color: '#94a3b8', fontSize: 12.5, fontStyle: 'italic' }}>No property</span>}
                   </td>
-                  <td style={{ fontSize: 12.5, color: '#64748b' }}>{t.nationality}</td>
+                  <td style={{ fontSize: 12.5, color: '#64748b' }}>
+                    {t.tenancy ? (
+                      <span>
+                        {new Date(t.tenancy.startDate).toLocaleDateString('en-GB')} →{' '}
+                        {t.tenancy.endDate ? new Date(t.tenancy.endDate).toLocaleDateString('en-GB') : 'Periodic'}
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td style={{ fontWeight: 700, color: '#0f172a' }}>
+                    {t.stats.monthlyRent ? `£${t.stats.monthlyRent.toLocaleString()}` : '—'}
+                  </td>
                   <td>
-                    {/* Clickable RTR badge */}
-                    <button
-                      onClick={() => setEditing(t)}
-                      title="Click to update RTR status"
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 5,
-                        padding: '4px 10px', borderRadius: 20,
-                        border: `1px solid ${statusConfig.color}40`,
-                        background: `${statusConfig.color}15`,
-                        color: statusConfig.color,
-                        fontSize: 12, fontWeight: 700,
-                        cursor: 'pointer', fontFamily: 'inherit',
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
-                      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                    >
-                      <Icon size={11} />
-                      {statusConfig.label.replace(/^[^\w]*/, '')}
-                      <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 2 }}>✎</span>
-                    </button>
-                    {notes && <p style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 3, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notes}</p>}
-                  </td>
-                  <td style={{ fontSize: 12.5, color: (status === 'expiring_soon') ? '#d97706' : '#64748b', fontWeight: (status === 'expiring_soon') ? 700 : 400 }}>
-                    {expiry ? new Date(expiry).toLocaleDateString('en-GB') : '—'}
-                  </td>
-                  <td style={{ fontWeight: 600, color: '#0f172a' }}>£{t.tenancy?.monthlyRent?.toLocaleString() || '—'}</td>
-                  <td>
-                    {t.tenancy?.arrears > 0
-                      ? <span style={{ fontWeight: 700, color: '#dc2626', fontSize: 13 }}>£{t.tenancy.arrears.toLocaleString()}</span>
+                    {t.stats.arrears > 0
+                      ? <span style={{ fontWeight: 800, color: '#dc2626', fontSize: 13 }}>£{t.stats.arrears.toLocaleString()}</span>
                       : <span style={{ color: '#10b981', fontSize: 12, fontWeight: 600 }}>Clear</span>}
                   </td>
+                  <td>{rtrBadge(t)}</td>
+                  <td><span className={`badge ${sc.class}`}>{sc.label}</span></td>
                   <td>
-                    <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                      {t.isCustom && (
-                        <>
-                          <button onClick={e => { e.stopPropagation(); setEditingTenant(t) }}
-                            style={{ width:26, height:26, borderRadius:6, border:'1px solid #e2e8f0', background:'white', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
-                            title="Edit tenant">
-                            <Edit2 size={11} color="#64748b" />
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); if(confirm('Delete this tenant?')) { const updated = customTenants.filter(ct => ct.id !== t.id); localStorage.setItem('propertyops_custom_tenants', JSON.stringify(updated)); setCustomTenants(updated) } }}
-                            style={{ width:26, height:26, borderRadius:6, border:'1px solid #fecaca', background:'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
-                            title="Delete tenant">
-                            <Trash2 size={11} color="#dc2626" />
-                          </button>
-                        </>
-                      )}
-                      <ChevronRight size={13} color="#cbd5e1" />
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <button className="btn-primary" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => navigate(`/tenants/${t.id}`)}>
+                        <Eye size={10} /> Profile
+                      </button>
+                      <button className="btn-secondary" style={{ fontSize: 11, padding: '4px 7px' }} onClick={() => setEditingTenant(t)}>
+                        <Edit2 size={10} />
+                      </button>
+                      <button style={{ fontSize: 11, padding: '4px 7px', borderRadius: 7, border: '1px solid #fecaca', background: '#fef2f2', cursor: 'pointer', fontFamily: 'inherit' }}
+                        onClick={() => { if (archived.includes(t.id)) { unarchiveTenant(t.id); showToast('Tenant restored') } else { archiveTenant(t.id); showToast('Tenant archived') } doRefresh() }}>
+                        <Archive size={10} color="#dc2626" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -331,118 +187,52 @@ export default function Tenants() {
             })}
           </tbody>
         </table>
+        {filtered.length === 0 && (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+            <User size={32} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
+            <p style={{ fontWeight: 600 }}>No tenants found</p>
+          </div>
+        )}
       </div>
 
-      {/* ── MOBILE CARDS ── */}
+      {/* Mobile cards */}
       <div className="mobile-card-list">
-        <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>{enriched.length} tenants · tap RTR badge to update</p>
-        {enriched.map(t => {
-          const { statusConfig, status, expiry } = t.rtr
-          const Icon = statusConfig.icon
+        {filtered.map(t => {
+          const sc = STATUS_CONFIG[t.status] || STATUS_CONFIG.active
           return (
-            <div key={t.id} style={{ background: 'white', borderRadius: 12, padding: '14px 16px', border: `1px solid ${status === 'not_verified' ? '#fecaca' : status === 'expiring_soon' ? '#fde68a' : '#e2e8f0'}` }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <User size={18} color="#10b981" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontWeight: 700, fontSize: 14.5, color: '#0f172a' }}>{t.name}</p>
-                  <p style={{ fontSize: 12, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.property?.address}</p>
-                </div>
-                {t.tenancy?.arrears > 0 && <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 800, color: '#dc2626' }}>£{t.tenancy.arrears.toLocaleString()}</p>
-                  <p style={{ fontSize: 10.5, color: '#dc2626' }}>arrears</p>
-                </div>}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <div style={{ background: `${statusConfig.color}10`, border: `1px solid ${statusConfig.color}30`, borderRadius: 8, padding: '8px 10px' }}>
-                  <p style={{ fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', marginBottom: 4 }}>Right to Rent</p>
-                  <button onClick={() => setEditing(t)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
-                    <Icon size={13} color={statusConfig.color} />
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: statusConfig.color }}>{statusConfig.label.replace(/^[^\w]*/, '')} ✎</span>
+            <div key={t.id} style={{ background: 'white', borderRadius: 12, padding: '14px 16px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div>
+                  <button onClick={() => navigate(`/tenants/${t.id}`)} style={{ fontWeight: 700, fontSize: 14.5, color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                    {t.name}
                   </button>
-                  {expiry && <p style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>Exp: {new Date(expiry).toLocaleDateString('en-GB')}</p>}
+                  <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{t.property?.address || 'No property'}</p>
                 </div>
-                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
-                  <p style={{ fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', color: '#94a3b8', marginBottom: 4 }}>Monthly Rent</p>
-                  <p style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{t.tenancy ? `£${t.tenancy.monthlyRent.toLocaleString()}` : '—'}</p>
-                </div>
+                <span className={`badge ${sc.class}`}>{sc.label}</span>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 10, borderTop: '1px solid #f8fafc', marginTop: 10 }}>
-                <a href={`tel:${t.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: '#334155', textDecoration: 'none', flex: 1 }}>
-                  <Phone size={12} color="#94a3b8" /> {t.phone}
-                </a>
-                <span style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>{t.nationality}</span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {t.stats.monthlyRent > 0 && <span style={{ fontSize: 12.5, color: '#64748b' }}>£{t.stats.monthlyRent.toLocaleString()}/mo</span>}
+                {t.stats.arrears > 0 && <span style={{ fontSize: 12.5, fontWeight: 700, color: '#dc2626' }}>£{t.stats.arrears.toLocaleString()} arrears</span>}
+                {rtrBadge(t)}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* RTR Update Modal */}
-      {editing && (
-        <RTRModal
-          tenant={editing}
-          property={editing.property}
-          currentRTR={editing.rtr}
-          onSave={handleSave}
-          onClose={() => setEditing(null)}
-        />
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)', background: '#0f172a', color: 'white', padding: '10px 20px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, zIndex: 80, boxShadow: '0 8px 24px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CheckCircle size={14} color="#10b981" /> {toast}
+        </div>
       )}
 
-      {/* Edit custom tenant modal */}
+      {showAddTenant && (
+        <AddEditTenantModal onSave={() => { doRefresh(); showToast('Tenant added') }} onClose={() => setShowAddTenant(false)} />
+      )}
       {editingTenant && (
-        <EditTenantModal
-          tenant={editingTenant}
-          onSave={(updated) => {
-            const exists = customTenants.find(t => t.id === updated.id)
-            const all = exists
-              ? customTenants.map(t => t.id === updated.id ? updated : t)
-              : [updated, ...customTenants]
-            localStorage.setItem('propertyops_custom_tenants', JSON.stringify(all))
-            setCustomTenants(all)
-            setEditingTenant(null)
-          }}
-          onClose={() => setEditingTenant(null)}
-        />
+        <AddEditTenantModal tenant={editingTenant} onSave={() => { doRefresh(); showToast('Tenant updated') }} onClose={() => setEditingTenant(null)} />
       )}
-    </div>
-  )
-}
-
-// ─── Edit Custom Tenant Modal ─────────────────────────────────────────────────
-function EditTenantModal({ tenant, onSave, onClose }) {
-  const [form, setForm] = useState({ name: tenant.name, email: tenant.email, phone: tenant.phone || '', nationality: tenant.nationality || 'British' })
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
-  const inputStyle = { width:'100%', border:'1.5px solid #e2e8f0', borderRadius:9, padding:'10px 12px', fontSize:13.5, outline:'none', fontFamily:'inherit', color:'#0f172a', boxSizing:'border-box' }
-  const labelStyle = { display:'block', fontSize:11.5, fontWeight:700, textTransform:'uppercase', color:'#94a3b8', letterSpacing:'0.05em', marginBottom:5 }
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.7)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={onClose}>
-      <div style={{ background:'white', borderRadius:16, width:'100%', maxWidth:420, padding:24, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <h2 style={{ fontSize:17, fontWeight:800, color:'#0f172a' }}>Edit Tenant</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer' }}><X size={17} color="#94a3b8" /></button>
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:13 }}>
-          <div><label style={labelStyle}>Full Name</label><input value={form.name} onChange={set('name')} style={inputStyle} onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} /></div>
-          <div><label style={labelStyle}>Email</label><input type="email" value={form.email} onChange={set('email')} style={inputStyle} onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} /></div>
-          <div><label style={labelStyle}>Phone</label><input value={form.phone} onChange={set('phone')} style={inputStyle} onFocus={e => e.target.style.borderColor='#10b981'} onBlur={e => e.target.style.borderColor='#e2e8f0'} /></div>
-          <div>
-            <label style={labelStyle}>Nationality</label>
-            <select value={form.nationality} onChange={set('nationality')} style={{ ...inputStyle, cursor:'pointer' }}>
-              {['British','Irish','EU Pre-settled','EU Settled','Tier 2 Visa','Student Visa','Other'].map(n => <option key={n}>{n}</option>)}
-            </select>
-          </div>
-        </div>
-        <div style={{ display:'flex', gap:10, marginTop:20 }}>
-          <button className="btn-secondary" style={{ flex:1, justifyContent:'center' }} onClick={onClose}>Cancel</button>
-          <button className="btn-primary" style={{ flex:2, justifyContent:'center' }} onClick={() => onSave({ ...tenant, ...form })}>
-            <Save size={13} /> Save Changes
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

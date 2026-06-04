@@ -39,7 +39,7 @@ const STEPS = [
   { n: 4, label: 'Compliance', icon: ShieldCheck },
 ]
 
-export default function PropertyOnboardingWizard({ onComplete, onClose }) {
+export default function PropertyOnboardingWizard({ onComplete, onClose, defaultLandlordId }) {
   const [step, setStep]     = useState(1)
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -55,7 +55,7 @@ export default function PropertyOnboardingWizard({ onComplete, onClose }) {
 
   // ── Step 2: Landlord ────────────────────────────────────────────────────────
   const [landlordMode, setLandlordMode] = useState('select') // 'select' | 'new'
-  const [selectedLandlordId, setSelectedLandlordId] = useState('')
+  const [selectedLandlordId, setSelectedLandlordId] = useState(defaultLandlordId || '')
   const [newLandlord, setNewLandlord] = useState({
     name: '', email: '', phone: '', address: '',
     type: 'Individual', managementFee: 10, notes: '',

@@ -132,7 +132,7 @@ export default function LandlordProfile() {
             <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', flexShrink: 0 }}>
               <button className="btn-secondary" style={{ fontSize: 13 }} onClick={() => setShowEmail(true)}><Mail size={13} /> Email</button>
               <button className="btn-secondary" style={{ fontSize: 13 }} onClick={() => { setShowEdit(true) }}><Edit2 size={13} /> Edit</button>
-              <button className="btn-primary" style={{ fontSize: 13 }} onClick={() => navigate('/properties', { state: { openWizard: true, landlordId: id } })}><Plus size={13} /> Add Property</button>
+              <button className="btn-primary" style={{ fontSize: 13 }} onClick={() => navigate(`/properties?new=true&landlordId=${id}`)}><Plus size={13} /> Add Property</button>
             </div>
           </div>
         </div>
@@ -206,7 +206,7 @@ export default function LandlordProfile() {
                     { label: 'Draft Email',       icon: Mail,         action: () => setShowEmail(true) },
                     { label: 'Statement Preview', icon: Download,     action: () => setShowStatement(true) },
                     { label: 'Edit Details',      icon: Edit2,        action: () => setShowEdit(true) },
-                    { label: 'Add Property',      icon: Building2,    action: () => navigate('/properties') },
+                    { label: 'Add Property',      icon: Building2,    action: () => navigate(`/properties?new=true&landlordId=${id}`) },
                   ].map(a => (
                     <button key={a.label} onClick={a.action}
                       style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 9, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#334155', transition: 'all 0.15s' }}

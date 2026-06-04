@@ -14,6 +14,7 @@ import Tenancies from './pages/Tenancies'
 import Landlords from './pages/Landlords'
 import LandlordProfile from './pages/LandlordProfile'
 import Tenants from './pages/Tenants'
+import TenantProfile from './pages/TenantProfile'
 import Inspections from './pages/Inspections'
 import Compliance from './pages/Compliance'
 import Maintenance from './pages/Maintenance'
@@ -115,6 +116,7 @@ function AppRoutes() {
           <Route path="/landlords"              element={<PageWrapper><Landlords /></PageWrapper>} />
           <Route path="/landlords/:id"          element={<PageWrapper><LandlordProfile /></PageWrapper>} />
           <Route path="/tenants"                element={<PageWrapper><Tenants /></PageWrapper>} />
+          <Route path="/tenants/:id"            element={<PageWrapper><TenantProfile /></PageWrapper>} />
           <Route path="/inspections"            element={<PageWrapper><Inspections /></PageWrapper>} />
           <Route path="/compliance"             element={<PageWrapper><Compliance /></PageWrapper>} />
           <Route path="/maintenance"            element={<PageWrapper><Maintenance /></PageWrapper>} />
